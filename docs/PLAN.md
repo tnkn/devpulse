@@ -40,30 +40,30 @@ GitHubリポジトリごとの開発状況をDORAメトリクスに基づいて�
 
 ### Phase 1: 基盤構築
 
-- [ ] プロジェクト初期化（Next.js + pnpm + mise）
-- [ ] Dockerfile作成
-- [ ] 基本レイアウト・ナビゲーション
-- [ ] データディレクトリ読み込みAPI
+- [x] プロジェクト初期化（Next.js + pnpm + mise）
+- [x] Dockerfile作成
+- [x] 基本レイアウト・ナビゲーション
+- [x] データディレクトリ読み込みAPI
 
 ### Phase 2: データ表示
 
-- [ ] リポジトリ一覧ページ
-- [ ] ダンプデータ選択機能
-- [ ] 基本的なメトリクス計算ロジック
+- [x] リポジトリ一覧ページ
+- [x] ダンプデータ選択機能
+- [x] 基本的なメトリクス計算ロジック
 
 ### Phase 3: DORA メトリクス可視化
 
-- [ ] Deployment Frequency グラフ
-- [ ] Lead Time for Changes グラフ
-- [ ] Change Failure Rate グラフ
-- [ ] MTTR グラフ
-- [ ] ダッシュボード（全メトリクス概要）
+- [x] Deployment Frequency グラフ
+- [x] Lead Time for Changes グラフ
+- [x] Change Failure Rate グラフ
+- [x] MTTR グラフ
+- [x] ダッシュボード（全メトリクス概要）
 
 ### Phase 4: 拡張機能
 
-- [ ] 期間フィルター
-- [ ] リポジトリ比較機能
-- [ ] データエクスポート（CSV/JSON）
+- [x] 期間フィルター
+- [x] リポジトリ比較機能
+- [x] データエクスポート（CSV/JSON）
 
 ## ディレクトリ構成
 
