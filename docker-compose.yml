@@ -1,0 +1,10 @@
+services:
+  dev-vis:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data:ro
+    environment:
+      - DATA_DIR=/data
+    restart: unless-stopped
