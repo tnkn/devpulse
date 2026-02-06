@@ -1,18 +1,18 @@
-import { promises as fs } from "fs";
-import path from "path";
-import type { CollectionJob, DumpMetadata } from "@/types";
-import { getCommits, getPullRequests, getReleases, getIssues } from "./client";
+import type { CollectionJob } from "@/types";
+import { getCommits, getPullRequests, getReleases, getIssues, getCommitCheckFailed } from "./client";
+import { getConnection, checkpoint } from "@/lib/db";
+import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata } from "@/lib/db/upsert";
 
-const DATA_DIR = process.env.DATA_DIR || "./data";
-const jobs = new Map<string, CollectionJob>();
+const globalJobs = globalThis as unknown as {
+  __dev_vis_jobs?: Map<string, CollectionJob>;
+};
+if (!globalJobs.__dev_vis_jobs) {
+  globalJobs.__dev_vis_jobs = new Map();
+}
+const jobs = globalJobs.__dev_vis_jobs;
 
 function generateJobId(): string {
   return `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function formatTimestamp(date: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
 export function startCollection(owner: string, repo: string): CollectionJob {
@@ -43,56 +43,138 @@ export function getJob(id: string): CollectionJob | undefined {
   return jobs.get(id);
 }
 
-async function runCollection(job: CollectionJob): Promise<void> {
+async function getLatestTimestamps(repoKey: string): Promise<{
+  commitSince: string | null;
+  prSince: string | null;
+  issueSince: string | null;
+}> {
+  const conn = await getConnection(repoKey);
   try {
-    job.status = "collecting";
-    const { owner, repo } = job;
-    const dirName = `${owner}__${repo}`;
-    const timestamp = formatTimestamp(new Date());
-    const dumpDir = path.resolve(DATA_DIR, dirName, timestamp);
-
-    await fs.mkdir(dumpDir, { recursive: true });
-
-    // Collect commits
-    job.progress = "Collecting commits...";
-    const commits = await getCommits(owner, repo);
-
-    // Collect pull requests
-    job.progress = "Collecting pull requests...";
-    const pulls = await getPullRequests(owner, repo);
-
-    // Collect releases
-    job.progress = "Collecting releases...";
-    const releases = await getReleases(owner, repo);
-
-    // Collect issues
-    job.progress = "Collecting issues...";
-    const issues = await getIssues(owner, repo);
-
-    // Write data files
-    job.progress = "Writing data files...";
-    const metadata: DumpMetadata = {
-      repository: `${owner}/${repo}`,
-      repository_url: `https://github.com/${owner}/${repo}`,
-      dumped_at: new Date().toISOString(),
-      commit_count: commits.length,
-      pull_request_count: pulls.length,
-      release_count: releases.length,
-      issue_count: issues.length,
-    };
-
-    await Promise.all([
-      fs.writeFile(path.join(dumpDir, "metadata.json"), JSON.stringify(metadata, null, 2)),
-      fs.writeFile(path.join(dumpDir, "commits.json"), JSON.stringify(commits, null, 2)),
-      fs.writeFile(path.join(dumpDir, "pulls.json"), JSON.stringify(pulls, null, 2)),
-      fs.writeFile(path.join(dumpDir, "releases.json"), JSON.stringify(releases, null, 2)),
-      fs.writeFile(path.join(dumpDir, "issues.json"), JSON.stringify(issues, null, 2)),
+    const [commitReader, prReader, issueReader] = await Promise.all([
+      conn.runAndReadAll("SELECT MAX(author_date) FROM commits"),
+      conn.runAndReadAll("SELECT MAX(updated_at) FROM pull_requests"),
+      conn.runAndReadAll("SELECT MAX(updated_at) FROM issues"),
     ]);
 
+    const commitRows = commitReader.getRows();
+    const prRows = prReader.getRows();
+    const issueRows = issueReader.getRows();
+
+    return {
+      commitSince: commitRows[0]?.[0] != null ? String(commitRows[0][0]) : null,
+      prSince: prRows[0]?.[0] != null ? String(prRows[0][0]) : null,
+      issueSince: issueRows[0]?.[0] != null ? String(issueRows[0][0]) : null,
+    };
+  } finally {
+    conn.closeSync();
+  }
+}
+
+async function runCollection(job: CollectionJob): Promise<void> {
+  const { owner, repo } = job;
+  const repoKey = `${owner}__${repo}`;
+
+  try {
+    job.status = "collecting";
+
+    // Get latest timestamps for differential fetch
+    job.progress = "Checking existing data...";
+    const timestamps = await getLatestTimestamps(repoKey);
+    const isDiff = !!(timestamps.commitSince || timestamps.prSince || timestamps.issueSince);
+
+    if (isDiff) {
+      console.log(`[collector] Differential fetch for ${owner}/${repo} (commits since: ${timestamps.commitSince}, PRs since: ${timestamps.prSince}, issues since: ${timestamps.issueSince})`);
+    } else {
+      console.log(`[collector] Full fetch for ${owner}/${repo}`);
+    }
+
+    // Collect commits (supports `since`)
+    job.progress = "Collecting commits...";
+    const newCommits = await getCommits(owner, repo, timestamps.commitSince ? { since: timestamps.commitSince } : undefined);
+    console.log(`[collector] Fetched ${newCommits.length} commits`);
+
+    // Collect pull requests (uses updated_at cutoff)
+    job.progress = "Collecting pull requests...";
+    const newPulls = await getPullRequests(owner, repo, timestamps.prSince ? { since: timestamps.prSince } : undefined);
+    console.log(`[collector] Fetched ${newPulls.length} pull requests`);
+
+    // Collect releases (always full fetch, typically small)
+    job.progress = "Collecting releases...";
+    const newReleases = await getReleases(owner, repo);
+    console.log(`[collector] Fetched ${newReleases.length} releases`);
+
+    // Collect issues (supports `since`)
+    job.progress = "Collecting issues...";
+    const newIssues = await getIssues(owner, repo, timestamps.issueSince ? { since: timestamps.issueSince } : undefined);
+    console.log(`[collector] Fetched ${newIssues.length} issues`);
+
+    // Upsert into DuckDB
+    job.progress = "Saving to database...";
+    const conn = await getConnection(repoKey);
+    try {
+      await upsertCommits(conn, newCommits);
+      await upsertPullRequests(conn, newPulls);
+      await upsertReleases(conn, newReleases);
+      await upsertIssues(conn, newIssues);
+
+      // Collect CI status for merged PRs that don't have ci_failed yet
+      const ciReader = await conn.runAndReadAll(
+        "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL"
+      );
+      const prsNeedingCI = ciReader.getRows();
+      if (prsNeedingCI.length > 0) {
+        job.progress = `Checking CI status (0/${prsNeedingCI.length})...`;
+        const BATCH_SIZE = 10;
+        const ciResults: { number: number; ci_failed: boolean }[] = [];
+
+        for (let i = 0; i < prsNeedingCI.length; i += BATCH_SIZE) {
+          const batch = prsNeedingCI.slice(i, i + BATCH_SIZE);
+          const results = await Promise.all(
+            batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1])))
+          );
+          batch.forEach((row, idx) => {
+            ciResults.push({ number: Number(row[0]), ci_failed: results[idx] });
+          });
+          job.progress = `Checking CI status (${Math.min(i + BATCH_SIZE, prsNeedingCI.length)}/${prsNeedingCI.length})...`;
+        }
+
+        // Update CI status in DB
+        const stmt = await conn.prepare(
+          "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2"
+        );
+        for (const { number, ci_failed } of ciResults) {
+          stmt.bindBoolean(1, ci_failed);
+          stmt.bindInteger(2, number);
+          await stmt.run();
+        }
+        stmt.destroySync();
+      }
+
+      // Update metadata
+      await upsertMetadata(conn, `${owner}/${repo}`, `https://github.com/${owner}/${repo}`);
+    } finally {
+      conn.closeSync();
+    }
+
+    // Flush WAL to disk so data survives sudden container termination
+    await checkpoint(repoKey);
+
+    // Get final counts for progress message
+    const countConn = await getConnection(repoKey);
+    const countReader = await countConn.runAndReadAll(`
+      SELECT
+        (SELECT COUNT(*) FROM commits),
+        (SELECT COUNT(*) FROM pull_requests),
+        (SELECT COUNT(*) FROM releases),
+        (SELECT COUNT(*) FROM issues)
+    `);
+    const counts = countReader.getRows()[0];
+    countConn.closeSync();
+
     job.status = "completed";
-    job.progress = `Done! ${commits.length} commits, ${pulls.length} PRs, ${releases.length} releases, ${issues.length} issues`;
+    job.progress = `Done! ${counts[0]} commits, ${counts[1]} PRs, ${counts[2]} releases, ${counts[3]} issues`;
     job.completed_at = new Date().toISOString();
-    job.dump_path = `${dirName}/${timestamp}`;
+    job.dump_path = repoKey;
   } catch (err) {
     job.status = "failed";
     job.error = err instanceof Error ? err.message : "Unknown error";
