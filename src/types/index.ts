@@ -33,6 +33,9 @@ export interface PullRequest {
     sha: string;
   };
   labels: { name: string }[];
+  ci_failed?: boolean;
+  additions?: number;
+  deletions?: number;
 }
 
 export interface Release {
@@ -53,6 +56,15 @@ export interface Issue {
   updated_at: string;
   closed_at: string | null;
   labels: { name: string }[];
+}
+
+export interface Review {
+  id: number;
+  pr_number: number;
+  user_login: string;
+  user_type: string;
+  state: string;
+  submitted_at: string;
 }
 
 export interface DumpMetadata {
@@ -81,6 +93,15 @@ export interface LeadTimeForChanges {
   merged_at: string;
 }
 
+export interface LeadTimePeriodStats {
+  period: string;
+  avg_hours: number;
+  stddev_hours: number;
+  plus_sigma: number;
+  minus_sigma: number;
+  count: number;
+}
+
 export interface ChangeFailureRate {
   period: string;
   total_deployments: number;
@@ -88,19 +109,47 @@ export interface ChangeFailureRate {
   failure_rate: number;
 }
 
-export interface TimeToRestore {
-  issue_number: number;
+export interface RevertRate {
+  period: string;
+  total_commits: number;
+  revert_commits: number;
+  revert_rate: number;
+}
+
+export interface PRSize {
+  pr_number: number;
   title: string;
-  time_to_restore_hours: number;
+  additions: number;
+  deletions: number;
+  total_lines: number;
+  merged_at: string;
+}
+
+export interface PickupTime {
+  pr_number: number;
+  title: string;
+  pickup_time_hours: number;
   created_at: string;
-  closed_at: string;
+  first_review_at: string;
 }
 
 export interface DORAMetrics {
   deployment_frequency: DeploymentFrequency[];
   lead_time_for_changes: LeadTimeForChanges[];
+  lead_time_stats: LeadTimePeriodStats[];
   change_failure_rate: ChangeFailureRate[];
-  time_to_restore: TimeToRestore[];
+  revert_rate: RevertRate[];
+  pr_size: PRSize[];
+  pickup_time: PickupTime[];
+}
+
+export type PeriodGranularity = "day" | "week" | "month";
+
+export interface PeriodMetrics {
+  deployment_frequency: DeploymentFrequency[];
+  lead_time_stats: LeadTimePeriodStats[];
+  change_failure_rate: ChangeFailureRate[];
+  revert_rate: RevertRate[];
 }
 
 // GitHub API 型定義
@@ -135,11 +184,5 @@ export interface CollectionJob {
 export interface Repository {
   name: string;
   displayName: string;
-  dumps: DumpInfo[];
-}
-
-export interface DumpInfo {
-  id: string;
-  timestamp: string;
-  path: string;
+  lastCollected: string | null;
 }

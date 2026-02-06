@@ -1,5 +1,5 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { Commit, PullRequest, Release, Issue } from "@/types";
+import type { Commit, PullRequest, Release, Issue, Review } from "@/types";
 
 export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): Promise<void> {
   if (commits.length === 0) return;
@@ -24,8 +24,8 @@ export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): 
 export async function upsertPullRequests(conn: DuckDBConnection, prs: PullRequest[]): Promise<void> {
   if (prs.length === 0) return;
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
   );
   for (const pr of prs) {
     stmt.bindInteger(1, pr.number);
@@ -42,6 +42,8 @@ export async function upsertPullRequests(conn: DuckDBConnection, prs: PullReques
     stmt.bindVarchar(12, pr.base.sha);
     stmt.bindVarchar(13, JSON.stringify(pr.labels));
     if (pr.ci_failed !== undefined) stmt.bindBoolean(14, pr.ci_failed); else stmt.bindNull(14);
+    if (pr.additions !== undefined) stmt.bindInteger(15, pr.additions); else stmt.bindNull(15);
+    if (pr.deletions !== undefined) stmt.bindInteger(16, pr.deletions); else stmt.bindNull(16);
     await stmt.run();
   }
   stmt.destroySync();
@@ -82,6 +84,40 @@ export async function upsertIssues(conn: DuckDBConnection, issues: Issue[]): Pro
     stmt.bindVarchar(7, JSON.stringify(i.labels));
     await stmt.run();
   }
+  stmt.destroySync();
+}
+
+export async function upsertReviews(conn: DuckDBConnection, reviews: Review[]): Promise<void> {
+  if (reviews.length === 0) return;
+  const stmt = await conn.prepare(
+    `INSERT OR REPLACE INTO reviews (id, pr_number, user_login, user_type, state, submitted_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`
+  );
+  for (const r of reviews) {
+    stmt.bindInteger(1, r.id);
+    stmt.bindInteger(2, r.pr_number);
+    stmt.bindVarchar(3, r.user_login);
+    stmt.bindVarchar(4, r.user_type);
+    stmt.bindVarchar(5, r.state);
+    stmt.bindVarchar(6, r.submitted_at);
+    await stmt.run();
+  }
+  stmt.destroySync();
+}
+
+export async function updatePRSize(
+  conn: DuckDBConnection,
+  number: number,
+  additions: number,
+  deletions: number
+): Promise<void> {
+  const stmt = await conn.prepare(
+    "UPDATE pull_requests SET additions = $1, deletions = $2 WHERE number = $3"
+  );
+  stmt.bindInteger(1, additions);
+  stmt.bindInteger(2, deletions);
+  stmt.bindInteger(3, number);
+  await stmt.run();
   stmt.destroySync();
 }
 
