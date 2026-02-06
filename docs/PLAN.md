@@ -9,7 +9,7 @@ GitHubリポジトリごとの開発状況をDORAメトリクスに基づいて�
 - **フレームワーク**: Next.js (App Router)
 - **パッケージマネージャー**: pnpm
 - **環境構築**: mise
-- **データ永続化**: ファイルベース（コンテナ内ディレクトリ）
+- **データ永続化**: DuckDB（リポジトリごとに独立した DB ファイル）
 - **コンテナ**: Docker
 
 ## DORAメトリクス
@@ -25,16 +25,32 @@ GitHubリポジトリごとの開発状況をDORAメトリクスに基づいて�
 
 ## データ構造
 
+リポジトリごとに独立した DuckDB ファイルで管理:
+
 ```
 /data
-  └── <repository_name>/
-      └── <YYYYMMDD_HHMMSS>/
-          ├── commits.json      # コミット履歴
-          ├── pulls.json        # PR履歴
-          ├── releases.json     # リリース/タグ履歴
-          ├── issues.json       # Issue履歴
-          └── metadata.json     # ダンプ情報（日時、リポジトリURL等）
+  └── <owner>__<repo>/
+      └── repo.duckdb          # DuckDB データベース
 ```
+
+### テーブル構成
+
+| テーブル | 主キー | 説明 |
+|----------|--------|------|
+| `metadata` | `full_name` | リポジトリメタデータ（1行） |
+| `commits` | `sha` | コミット履歴 |
+| `pull_requests` | `number` | PR 履歴（labels は JSON 文字列で保存） |
+| `releases` | `id` | リリース履歴 |
+| `issues` | `number` | Issue 履歴（labels は JSON 文字列で保存） |
+
+### 差分取得
+
+2回目以降のデータ収集では差分のみ取得し、`INSERT OR REPLACE` で upsert:
+
+- **commits**: `since` パラメータ（最新 `author_date` 以降）
+- **issues**: `since` パラメータ（最新 `updated_at` 以降）
+- **pull_requests**: `sort=updated&direction=desc` + 最新 `updated_at` で打ち切り
+- **releases**: 件数が少ないため毎回全件取得
 
 ## 機能一覧
 
@@ -65,6 +81,14 @@ GitHubリポジトリごとの開発状況をDORAメトリクスに基づいて�
 - [x] リポジトリ比較機能
 - [x] データエクスポート（CSV/JSON）
 
+### Phase 5: DuckDB 移行 + 差分取得
+
+- [x] DuckDB によるデータ永続化（`@duckdb/node-api`）
+- [x] リポジトリごとの独立 DB ファイル
+- [x] 差分フェッチ（`since` パラメータ / `updated_at` 打ち切り）
+- [x] `INSERT OR REPLACE` による upsert
+- [x] 既存 JSON ダンプからの自動マイグレーション
+
 ## ディレクトリ構成
 
 ```
@@ -83,7 +107,9 @@ dev-vis/
 │   │   ├── charts/             # グラフコンポーネント
 │   │   └── ui/                 # 共通UIコンポーネント
 │   ├── lib/
-│   │   ├── data/               # データ読み込みロジック
+│   │   ├── db/                 # DuckDB インスタンス管理・スキーマ・upsert・マイグレーション
+│   │   ├── data/               # データ読み込みロジック（DuckDB クエリ）
+│   │   ├── github/             # GitHub API クライアント・データ収集
 │   │   └── metrics/            # メトリクス計算ロジック
 │   └── types/                  # 型定義
 ├── public/
@@ -120,7 +146,6 @@ docker compose up --build
 
 ## 次のステップ
 
-1. mise.toml でNode.js環境を定義
-2. `pnpm create next-app` でプロジェクト初期化
-3. 基本的なディレクトリ構造を作成
-4. Dockerfile / docker-compose.yml を作成
+- パフォーマンス最適化（大規模リポジトリでのクエリチューニング）
+- DB バックアップ / リストア機能
+- Webhook による自動データ収集

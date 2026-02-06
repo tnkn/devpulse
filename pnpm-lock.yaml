@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@duckdb/node-api':
+        specifier: 1.4.4-r.1
+        version: 1.4.4-r.1
       next:
         specifier: 16.1.6
         version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -118,6 +121,37 @@ packages:
   '@babel/types@7.29.0':
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
+
+  '@duckdb/node-api@1.4.4-r.1':
+    resolution: {integrity: sha512-oqaH9DXTJNwyLkd2FgJwmSnWVqjB5irbESeTeNVMBnM03iRaNY545BhfBDumu1TnOV2koIdG1mNsmjgq/ZTIkA==}
+
+  '@duckdb/node-bindings-darwin-arm64@1.4.4-r.1':
+    resolution: {integrity: sha512-/NtbkCgCAOJDxw41XvSGV/mxQAlsx+2xUvhIVUj6fxoOfTG4jTttRhuphwE3EXNoWzJOjZxCZ5LwhC/qb6ZwLg==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@duckdb/node-bindings-darwin-x64@1.4.4-r.1':
+    resolution: {integrity: sha512-lzFRDrZwc1EoV513vmKufasiAQ2WlhEb0O6guRBarbvOKKVhRb8tQ5H7LPVTrIewjTI3XDgHrnK+vfh9L+xQcA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@duckdb/node-bindings-linux-arm64@1.4.4-r.1':
+    resolution: {integrity: sha512-wq92/EcTiOTRW1RSDOwjeLyMMXWwNVNwU21TQdfu3sgS86+Ih3raaK68leDgY5cWgf72We3J2W7HYz8GwxcMYw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@duckdb/node-bindings-linux-x64@1.4.4-r.1':
+    resolution: {integrity: sha512-fjYNc+t4/T7mhzZ57oJoIQaWvbYVvxhidcNNansQFiWnd6/JMLCULd4qnt8XI3Tt2BrZsraH690KSBIS3QPt0w==}
+    cpu: [x64]
+    os: [linux]
+
+  '@duckdb/node-bindings-win32-x64@1.4.4-r.1':
+    resolution: {integrity: sha512-+J+MUYGvYWfX0balWToDIy3CBYg7hHI0KQUQ39+SniinXlMF8+puRW6ebyQ+AXrcrKkwuj4wzJuEBD0AdhHGtw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@duckdb/node-bindings@1.4.4-r.1':
+    resolution: {integrity: sha512-NFm0AMrK3kiVLQhgnGUEjX5c8Elm93dYePZ9BUCvvd0AVVTKEBeRhBp9afziuzP3Sl5+7XQ1TyaBLsZJKKBDBQ==}
 
   '@emnapi/core@1.8.1':
     resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
@@ -2166,6 +2200,33 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
+
+  '@duckdb/node-api@1.4.4-r.1':
+    dependencies:
+      '@duckdb/node-bindings': 1.4.4-r.1
+
+  '@duckdb/node-bindings-darwin-arm64@1.4.4-r.1':
+    optional: true
+
+  '@duckdb/node-bindings-darwin-x64@1.4.4-r.1':
+    optional: true
+
+  '@duckdb/node-bindings-linux-arm64@1.4.4-r.1':
+    optional: true
+
+  '@duckdb/node-bindings-linux-x64@1.4.4-r.1':
+    optional: true
+
+  '@duckdb/node-bindings-win32-x64@1.4.4-r.1':
+    optional: true
+
+  '@duckdb/node-bindings@1.4.4-r.1':
+    optionalDependencies:
+      '@duckdb/node-bindings-darwin-arm64': 1.4.4-r.1
+      '@duckdb/node-bindings-darwin-x64': 1.4.4-r.1
+      '@duckdb/node-bindings-linux-arm64': 1.4.4-r.1
+      '@duckdb/node-bindings-linux-x64': 1.4.4-r.1
+      '@duckdb/node-bindings-win32-x64': 1.4.4-r.1
 
   '@emnapi/core@1.8.1':
     dependencies:
