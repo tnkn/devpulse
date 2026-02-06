@@ -1,4 +1,4 @@
-import { getRepositories, getDumpData } from "@/lib/data";
+import { getRepositories, getRepoData } from "@/lib/data";
 import { calculateDORAMetrics, calculateSummary } from "@/lib/metrics";
 import { ComparisonView } from "./ComparisonView";
 
@@ -19,31 +19,23 @@ export default async function ComparePage({ searchParams }: PageProps) {
 
   // Load metrics for selected repositories
   const repoMetrics = await Promise.all(
-    selectedRepos.map(async (repoParam) => {
-      const [repoName, dumpId] = repoParam.split(":");
+    selectedRepos.map(async (repoName) => {
       const repo = repositories.find((r) => r.name === repoName);
       if (!repo) return null;
 
-      const dump = dumpId
-        ? repo.dumps.find((d) => d.id === dumpId)
-        : repo.dumps[0];
-      if (!dump) return null;
-
-      const data = await getDumpData(repoName, dump.id);
+      const data = await getRepoData(repoName);
       if (!data.metadata) return null;
 
       const metrics = calculateDORAMetrics(
-        data.commits,
         data.pulls,
-        data.releases,
-        data.issues
+        data.commits,
+        data.reviews
       );
       const summary = calculateSummary(metrics);
 
       return {
         repoName,
-        dumpId: dump.id,
-        dumpTimestamp: dump.timestamp,
+        displayName: repo.displayName,
         metrics,
         summary,
       };

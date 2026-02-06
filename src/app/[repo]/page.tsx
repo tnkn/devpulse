@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRepoData } from "@/lib/data";
-import { calculateDORAMetrics, calculateSummary } from "@/lib/metrics";
+import { calculateDORAMetrics, calculateAllPeriodMetrics, calculateSummary } from "@/lib/metrics";
 import { MetricsDashboard } from "@/components/MetricsDashboard";
 import { UpdateButton, DeleteButton } from "@/components/ui";
 
@@ -25,8 +25,10 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
 
   const metrics = calculateDORAMetrics(
     data.pulls,
-    data.issues
+    data.commits,
+    data.reviews
   );
+  const allPeriodMetrics = calculateAllPeriodMetrics(data.pulls, data.commits);
   const summary = calculateSummary(metrics);
 
   return (
@@ -60,7 +62,7 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
       {/* Summary Cards */}
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">DORA Metrics Summary</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <SummaryCard
             title="Deployment Frequency"
             value={summary.total_deployments.toString()}
@@ -80,10 +82,22 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
             description="Average failure rate"
           />
           <SummaryCard
-            title="MTTR"
-            value={summary.avg_restore_time_hours.toString()}
+            title="Revert Rate"
+            value={`${summary.avg_revert_rate}%`}
+            unit=""
+            description="Average revert commit rate"
+          />
+          <SummaryCard
+            title="PR Size"
+            value={summary.avg_pr_size.toString()}
+            unit="LOC"
+            description="Average lines changed"
+          />
+          <SummaryCard
+            title="Pick-up Time"
+            value={summary.avg_pickup_time_hours.toString()}
             unit="hours"
-            description="Average time to restore"
+            description="Average time to first review"
           />
         </div>
       </section>
@@ -100,7 +114,7 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
       </section>
 
       {/* Interactive Dashboard */}
-      <MetricsDashboard metrics={metrics} repoName={decodedRepo} />
+      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} />
     </main>
   );
 }
