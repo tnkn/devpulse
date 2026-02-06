@@ -5,14 +5,14 @@ import type { DORAMetrics } from "@/types";
 interface Props {
   metrics: DORAMetrics;
   repoName: string;
-  dumpId: string;
 }
 
-export function ExportButtons({ metrics, repoName, dumpId }: Props) {
+export function ExportButtons({ metrics, repoName }: Props) {
+  const safeRepoName = repoName.replace(/\//g, "_");
+
   const handleExportJSON = () => {
     const data = {
       repository: repoName,
-      dump_id: dumpId,
       exported_at: new Date().toISOString(),
       metrics,
     };
@@ -20,7 +20,7 @@ export function ExportButtons({ metrics, repoName, dumpId }: Props) {
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
-    downloadBlob(blob, `${repoName}-${dumpId}-metrics.json`);
+    downloadBlob(blob, `${safeRepoName}-metrics.json`);
   };
 
   const handleExportCSV = () => {
@@ -44,27 +44,57 @@ export function ExportButtons({ metrics, repoName, dumpId }: Props) {
     });
     lines.push("");
 
-    // Change Failure Rate
-    lines.push("# Change Failure Rate");
-    lines.push("period,total_deployments,failed_deployments,failure_rate");
-    metrics.change_failure_rate.forEach((item) => {
+    // Lead Time Stats (period)
+    lines.push("# Lead Time Stats");
+    lines.push("period,avg_hours,stddev_hours,plus_sigma,minus_sigma,count");
+    metrics.lead_time_stats.forEach((item) => {
       lines.push(
-        `${item.period},${item.total_deployments},${item.failed_deployments},${item.failure_rate}`
+        `${item.period},${item.avg_hours},${item.stddev_hours},${item.plus_sigma},${item.minus_sigma},${item.count}`
       );
     });
     lines.push("");
 
-    // Time to Restore
-    lines.push("# Time to Restore (MTTR)");
-    lines.push("issue_number,title,time_to_restore_hours,created_at,closed_at");
-    metrics.time_to_restore.forEach((item) => {
+    // Change Failure Rate
+    lines.push("# Change Failure Rate");
+    lines.push("period,failed_deployments,failure_rate");
+    metrics.change_failure_rate.forEach((item) => {
       lines.push(
-        `${item.issue_number},"${item.title.replace(/"/g, '""')}",${item.time_to_restore_hours},${item.created_at},${item.closed_at}`
+        `${item.period},${item.failed_deployments},${item.failure_rate}`
+      );
+    });
+    lines.push("");
+
+    // Revert Rate
+    lines.push("# Revert Rate");
+    lines.push("period,total_commits,revert_commits,revert_rate");
+    metrics.revert_rate.forEach((item) => {
+      lines.push(
+        `${item.period},${item.total_commits},${item.revert_commits},${item.revert_rate}`
+      );
+    });
+    lines.push("");
+
+    // PR Size
+    lines.push("# PR Size");
+    lines.push("pr_number,title,additions,deletions,total_lines,merged_at");
+    metrics.pr_size.forEach((item) => {
+      lines.push(
+        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.additions},${item.deletions},${item.total_lines},${item.merged_at}`
+      );
+    });
+    lines.push("");
+
+    // Pick-up Time
+    lines.push("# Pick-up Time");
+    lines.push("pr_number,title,pickup_time_hours,created_at,first_review_at");
+    metrics.pickup_time.forEach((item) => {
+      lines.push(
+        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.pickup_time_hours},${item.created_at},${item.first_review_at}`
       );
     });
 
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    downloadBlob(blob, `${repoName}-${dumpId}-metrics.csv`);
+    downloadBlob(blob, `${safeRepoName}-metrics.csv`);
   };
 
   return (
