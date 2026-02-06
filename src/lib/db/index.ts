@@ -166,6 +166,27 @@ export async function checkpoint(repoKey: string): Promise<void> {
   }
 }
 
+/**
+ * Delete a repository's DB, WAL, and data directory.
+ * Closes the cached instance first if open.
+ */
+export async function deleteRepository(repoKey: string): Promise<void> {
+  // Close cached instance
+  const entry = cache.get(repoKey);
+  if (entry) {
+    try {
+      entry.instance.closeSync();
+    } catch {
+      // ignore
+    }
+    cache.delete(repoKey);
+  }
+
+  // Delete the entire repo directory (DB, WAL, and any JSON dumps)
+  const repoDir = path.resolve(DATA_DIR, repoKey);
+  await fs.rm(repoDir, { recursive: true, force: true });
+}
+
 export async function getRepositoryKeys(): Promise<string[]> {
   const dataPath = path.resolve(DATA_DIR);
   try {
