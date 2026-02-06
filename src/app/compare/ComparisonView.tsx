@@ -7,14 +7,15 @@ import type { Repository, DORAMetrics } from "@/types";
 
 interface RepoMetrics {
   repoName: string;
-  dumpId: string;
-  dumpTimestamp: string;
+  displayName: string;
   metrics: DORAMetrics;
   summary: {
     total_deployments: number;
     avg_lead_time_hours: number;
     avg_failure_rate: number;
-    avg_restore_time_hours: number;
+    avg_revert_rate: number;
+    avg_pr_size: number;
+    avg_pickup_time_hours: number;
   };
 }
 
@@ -33,11 +34,10 @@ export function ComparisonView({
   const [selected, setSelected] = useState<string[]>(initialSelected);
 
   const handleToggle = useCallback(
-    (repoName: string, dumpId?: string) => {
-      const key = dumpId ? `${repoName}:${dumpId}` : repoName;
-      const newSelected = selected.includes(key)
-        ? selected.filter((s) => s !== key && !s.startsWith(`${repoName}:`))
-        : [...selected.filter((s) => !s.startsWith(`${repoName}:`)), key];
+    (repoName: string) => {
+      const newSelected = selected.includes(repoName)
+        ? selected.filter((s) => s !== repoName)
+        : [...selected, repoName];
 
       setSelected(newSelected);
     },
@@ -62,33 +62,17 @@ export function ComparisonView({
             <div
               key={repo.name}
               className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                selected.some((s) => s === repo.name || s.startsWith(`${repo.name}:`))
+                selected.includes(repo.name)
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                   : "border-gray-200 dark:border-gray-700 hover:border-gray-400"
               }`}
-              onClick={() => handleToggle(repo.name, repo.dumps[0]?.id)}
+              onClick={() => handleToggle(repo.name)}
             >
-              <h3 className="font-semibold mb-2">{repo.name}</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {repo.dumps.length} dump(s)
-              </p>
-              {repo.dumps.length > 0 && (
-                <select
-                  className="mt-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handleToggle(repo.name, e.target.value)}
-                  value={
-                    selected
-                      .find((s) => s.startsWith(`${repo.name}:`))
-                      ?.split(":")[1] || repo.dumps[0]?.id
-                  }
-                >
-                  {repo.dumps.map((dump) => (
-                    <option key={dump.id} value={dump.id}>
-                      {formatTimestamp(dump.timestamp)}
-                    </option>
-                  ))}
-                </select>
+              <h3 className="font-semibold mb-2">{repo.displayName}</h3>
+              {repo.lastCollected && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Last collected: {formatTimestamp(repo.lastCollected)}
+                </p>
               )}
             </div>
           ))}
@@ -120,7 +104,7 @@ export function ComparisonView({
                   <th className="text-left py-3 px-4">Metric</th>
                   {selectedMetrics.map((m) => (
                     <th key={m.repoName} className="text-right py-3 px-4">
-                      {m.repoName}
+                      {m.displayName}
                     </th>
                   ))}
                 </tr>
@@ -130,7 +114,7 @@ export function ComparisonView({
                   <td className="py-3 px-4 font-medium">Deployment Frequency</td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
-                      {m.summary.total_deployments} deployments
+                      {m.summary.total_deployments} merges
                     </td>
                   ))}
                 </tr>
@@ -159,11 +143,31 @@ export function ComparisonView({
                   ))}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 font-medium">MTTR</td>
+                  <td className="py-3 px-4 font-medium">Revert Rate</td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
-                      <span className={getMTTRColor(m.summary.avg_restore_time_hours)}>
-                        {m.summary.avg_restore_time_hours} hours
+                      <span className={getRevertRateColor(m.summary.avg_revert_rate)}>
+                        {m.summary.avg_revert_rate}%
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="py-3 px-4 font-medium">Avg PR Size</td>
+                  {selectedMetrics.map((m) => (
+                    <td key={m.repoName} className="text-right py-3 px-4">
+                      <span className={getPRSizeColor(m.summary.avg_pr_size)}>
+                        {m.summary.avg_pr_size} LOC
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="py-3 px-4 font-medium">Pick-up Time</td>
+                  {selectedMetrics.map((m) => (
+                    <td key={m.repoName} className="text-right py-3 px-4">
+                      <span className={getPickupTimeColor(m.summary.avg_pickup_time_hours)}>
+                        {m.summary.avg_pickup_time_hours} hours
                       </span>
                     </td>
                   ))}
@@ -173,16 +177,13 @@ export function ComparisonView({
           </div>
 
           {/* Performance Rating */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
             {selectedMetrics.map((m) => (
               <div
                 key={m.repoName}
                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
               >
-                <h3 className="font-semibold mb-2">{m.repoName}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {formatTimestamp(m.dumpTimestamp)}
-                </p>
+                <h3 className="font-semibold mb-2">{m.displayName}</h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>Deployments:</span>
@@ -201,9 +202,21 @@ export function ComparisonView({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>MTTR:</span>
-                    <span className={getMTTRColor(m.summary.avg_restore_time_hours)}>
-                      {m.summary.avg_restore_time_hours}h
+                    <span>Revert Rate:</span>
+                    <span className={getRevertRateColor(m.summary.avg_revert_rate)}>
+                      {m.summary.avg_revert_rate}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>PR Size:</span>
+                    <span className={getPRSizeColor(m.summary.avg_pr_size)}>
+                      {m.summary.avg_pr_size} LOC
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Pick-up Time:</span>
+                    <span className={getPickupTimeColor(m.summary.avg_pickup_time_hours)}>
+                      {m.summary.avg_pickup_time_hours}h
                     </span>
                   </div>
                 </div>
@@ -255,8 +268,20 @@ function getFailureRateColor(rate: number): string {
   return "text-red-600 dark:text-red-400";
 }
 
-function getMTTRColor(hours: number): string {
+function getRevertRateColor(rate: number): string {
+  if (rate < 5) return "text-green-600 dark:text-green-400";
+  if (rate < 15) return "text-yellow-600 dark:text-yellow-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function getPRSizeColor(loc: number): string {
+  if (loc < 200) return "text-green-600 dark:text-green-400";
+  if (loc <= 500) return "text-yellow-600 dark:text-yellow-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function getPickupTimeColor(hours: number): string {
   if (hours < 4) return "text-green-600 dark:text-green-400";
-  if (hours < 24) return "text-yellow-600 dark:text-yellow-400";
+  if (hours <= 24) return "text-yellow-600 dark:text-yellow-400";
   return "text-red-600 dark:text-red-400";
 }
