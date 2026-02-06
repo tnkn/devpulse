@@ -118,36 +118,41 @@ async function runCollection(job: CollectionJob): Promise<void> {
       await upsertIssues(conn, newIssues);
 
       // Collect CI status for merged PRs that don't have ci_failed yet
-      const ciReader = await conn.runAndReadAll(
-        "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL"
-      );
-      const prsNeedingCI = ciReader.getRows();
-      if (prsNeedingCI.length > 0) {
-        job.progress = `Checking CI status (0/${prsNeedingCI.length})...`;
-        const BATCH_SIZE = 10;
-        const ciResults: { number: number; ci_failed: boolean }[] = [];
-
-        for (let i = 0; i < prsNeedingCI.length; i += BATCH_SIZE) {
-          const batch = prsNeedingCI.slice(i, i + BATCH_SIZE);
-          const results = await Promise.all(
-            batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1])))
-          );
-          batch.forEach((row, idx) => {
-            ciResults.push({ number: Number(row[0]), ci_failed: results[idx] });
-          });
-          job.progress = `Checking CI status (${Math.min(i + BATCH_SIZE, prsNeedingCI.length)}/${prsNeedingCI.length})...`;
-        }
-
-        // Update CI status in DB
-        const stmt = await conn.prepare(
-          "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2"
+      // This is optional — skip gracefully if the token lacks Checks permission
+      try {
+        const ciReader = await conn.runAndReadAll(
+          "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL"
         );
-        for (const { number, ci_failed } of ciResults) {
-          stmt.bindBoolean(1, ci_failed);
-          stmt.bindInteger(2, number);
-          await stmt.run();
+        const prsNeedingCI = ciReader.getRows();
+        if (prsNeedingCI.length > 0) {
+          job.progress = `Checking CI status (0/${prsNeedingCI.length})...`;
+          const BATCH_SIZE = 10;
+          const ciResults: { number: number; ci_failed: boolean }[] = [];
+
+          for (let i = 0; i < prsNeedingCI.length; i += BATCH_SIZE) {
+            const batch = prsNeedingCI.slice(i, i + BATCH_SIZE);
+            const results = await Promise.all(
+              batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1])))
+            );
+            batch.forEach((row, idx) => {
+              ciResults.push({ number: Number(row[0]), ci_failed: results[idx] });
+            });
+            job.progress = `Checking CI status (${Math.min(i + BATCH_SIZE, prsNeedingCI.length)}/${prsNeedingCI.length})...`;
+          }
+
+          // Update CI status in DB
+          const stmt = await conn.prepare(
+            "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2"
+          );
+          for (const { number, ci_failed } of ciResults) {
+            stmt.bindBoolean(1, ci_failed);
+            stmt.bindInteger(2, number);
+            await stmt.run();
+          }
+          stmt.destroySync();
         }
-        stmt.destroySync();
+      } catch (ciErr) {
+        console.warn(`[collector] Skipping CI status check: ${ciErr instanceof Error ? ciErr.message : ciErr}`);
       }
 
       // Update metadata
