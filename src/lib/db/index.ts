@@ -2,7 +2,7 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { promises as fs } from "fs";
 import path from "path";
-import { SCHEMA_DDL } from "./schema";
+import { SCHEMA_DDL, MIGRATION_DDL } from "./schema";
 import { migrateJsonToDb } from "./migrate-json";
 
 const DATA_DIR = process.env.DATA_DIR || "./data";
@@ -57,6 +57,19 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     .filter((s) => s.length > 0);
   for (const stmt of statements) {
     await conn.run(stmt);
+  }
+}
+
+async function runMigrations(conn: DuckDBConnection): Promise<void> {
+  const statements = MIGRATION_DDL.split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    try {
+      await conn.run(stmt);
+    } catch {
+      // Ignore errors (e.g. column already exists in older DuckDB versions)
+    }
   }
 }
 
@@ -117,6 +130,11 @@ export async function getDb(repoKey: string): Promise<DuckDBInstance> {
   // Initialize schema (CREATE TABLE IF NOT EXISTS — safe to run always)
   const conn = await instance.connect();
   await initSchema(conn);
+
+  // Run migrations for existing DBs (ADD COLUMN IF NOT EXISTS — safe to run always)
+  if (!isNew) {
+    await runMigrations(conn);
+  }
 
   // Auto-migrate from JSON if this is a new DB
   if (isNew) {

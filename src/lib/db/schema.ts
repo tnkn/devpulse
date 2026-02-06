@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS pull_requests (
   base_ref TEXT NOT NULL,
   base_sha TEXT NOT NULL,
   labels_json TEXT DEFAULT '[]',
-  ci_failed BOOLEAN
+  ci_failed BOOLEAN,
+  additions INTEGER,
+  deletions INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS releases (
@@ -55,5 +57,28 @@ CREATE TABLE IF NOT EXISTS issues (
   updated_at TEXT NOT NULL,
   closed_at TEXT,
   labels_json TEXT DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY,
+  pr_number INTEGER NOT NULL,
+  user_login TEXT NOT NULL,
+  user_type TEXT NOT NULL,
+  state TEXT NOT NULL,
+  submitted_at TEXT NOT NULL
+);
+`;
+
+export const MIGRATION_DDL = `
+ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS additions INTEGER;
+ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS deletions INTEGER;
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY,
+  pr_number INTEGER NOT NULL,
+  user_login TEXT NOT NULL,
+  user_type TEXT NOT NULL,
+  state TEXT NOT NULL,
+  submitted_at TEXT NOT NULL
 );
 `;

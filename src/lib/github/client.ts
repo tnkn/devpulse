@@ -4,6 +4,7 @@ import type {
   PullRequest,
   Release,
   Issue,
+  Review,
 } from "@/types";
 
 const GITHUB_API = "https://api.github.com";
@@ -264,6 +265,46 @@ export async function getCommitCheckFailed(
   return checkRuns.some(
     (cr) => cr.conclusion === "failure" || cr.conclusion === "timed_out"
   );
+}
+
+export async function getPullRequestDetail(
+  owner: string,
+  repo: string,
+  number: number
+): Promise<{ additions: number; deletions: number }> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${number}`,
+    { headers: headers() }
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  return {
+    additions: data.additions as number,
+    deletions: data.deletions as number,
+  };
+}
+
+export async function getPullRequestReviews(
+  owner: string,
+  repo: string,
+  number: number
+): Promise<Review[]> {
+  const raw = await fetchAllPages<Record<string, unknown>>(
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`
+  );
+  return raw.map((r) => {
+    const user = r.user as Record<string, unknown>;
+    return {
+      id: r.id as number,
+      pr_number: number,
+      user_login: (user?.login as string) || "unknown",
+      user_type: (user?.type as string) || "User",
+      state: r.state as string,
+      submitted_at: r.submitted_at as string,
+    };
+  });
 }
 
 export async function getIssues(owner: string, repo: string, opts?: FetchOptions): Promise<Issue[]> {

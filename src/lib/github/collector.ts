@@ -1,7 +1,7 @@
 import type { CollectionJob } from "@/types";
-import { getCommits, getPullRequests, getReleases, getIssues, getCommitCheckFailed } from "./client";
+import { getCommits, getPullRequests, getReleases, getIssues, getCommitCheckFailed, getPullRequestDetail, getPullRequestReviews } from "./client";
 import { getConnection, checkpoint } from "@/lib/db";
-import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata } from "@/lib/db/upsert";
+import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata, updatePRSize, upsertReviews } from "@/lib/db/upsert";
 
 const globalJobs = globalThis as unknown as {
   __dev_vis_jobs?: Map<string, CollectionJob>;
@@ -153,6 +153,59 @@ async function runCollection(job: CollectionJob): Promise<void> {
         }
       } catch (ciErr) {
         console.warn(`[collector] Skipping CI status check: ${ciErr instanceof Error ? ciErr.message : ciErr}`);
+      }
+
+      // Collect PR size (additions/deletions) for merged PRs that don't have it yet
+      try {
+        const sizeReader = await conn.runAndReadAll(
+          "SELECT number FROM pull_requests WHERE merged_at IS NOT NULL AND additions IS NULL"
+        );
+        const prsNeedingSize = sizeReader.getRows();
+        if (prsNeedingSize.length > 0) {
+          job.progress = `Fetching PR sizes (0/${prsNeedingSize.length})...`;
+          const BATCH_SIZE = 10;
+
+          for (let i = 0; i < prsNeedingSize.length; i += BATCH_SIZE) {
+            const batch = prsNeedingSize.slice(i, i + BATCH_SIZE);
+            const results = await Promise.all(
+              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0])))
+            );
+            for (let j = 0; j < batch.length; j++) {
+              await updatePRSize(conn, Number(batch[j][0]), results[j].additions, results[j].deletions);
+            }
+            job.progress = `Fetching PR sizes (${Math.min(i + BATCH_SIZE, prsNeedingSize.length)}/${prsNeedingSize.length})...`;
+          }
+        }
+      } catch (sizeErr) {
+        console.warn(`[collector] Skipping PR size fetch: ${sizeErr instanceof Error ? sizeErr.message : sizeErr}`);
+      }
+
+      // Collect reviews for merged PRs that don't have reviews yet
+      try {
+        const reviewReader = await conn.runAndReadAll(
+          `SELECT DISTINCT p.number FROM pull_requests p
+           LEFT JOIN reviews r ON p.number = r.pr_number
+           WHERE p.merged_at IS NOT NULL AND r.id IS NULL`
+        );
+        const prsNeedingReviews = reviewReader.getRows();
+        if (prsNeedingReviews.length > 0) {
+          job.progress = `Fetching reviews (0/${prsNeedingReviews.length})...`;
+          const BATCH_SIZE = 10;
+
+          for (let i = 0; i < prsNeedingReviews.length; i += BATCH_SIZE) {
+            const batch = prsNeedingReviews.slice(i, i + BATCH_SIZE);
+            const reviewBatches = await Promise.all(
+              batch.map((row) => getPullRequestReviews(owner, repo, Number(row[0])))
+            );
+            const allReviews = reviewBatches.flat();
+            if (allReviews.length > 0) {
+              await upsertReviews(conn, allReviews);
+            }
+            job.progress = `Fetching reviews (${Math.min(i + BATCH_SIZE, prsNeedingReviews.length)}/${prsNeedingReviews.length})...`;
+          }
+        }
+      } catch (reviewErr) {
+        console.warn(`[collector] Skipping reviews fetch: ${reviewErr instanceof Error ? reviewErr.message : reviewErr}`);
       }
 
       // Update metadata
