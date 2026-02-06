@@ -103,10 +103,38 @@ export interface DORAMetrics {
   time_to_restore: TimeToRestore[];
 }
 
+// GitHub API 型定義
+
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  owner: { login: string; avatar_url: string };
+  description: string | null;
+  private: boolean;
+  html_url: string;
+  language: string | null;
+  stargazers_count: number;
+  updated_at: string;
+}
+
+export interface CollectionJob {
+  id: string;
+  owner: string;
+  repo: string;
+  status: "pending" | "collecting" | "completed" | "failed";
+  progress: string;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  dump_path: string | null;
+}
+
 // アプリケーション型定義
 
 export interface Repository {
   name: string;
+  displayName: string;
   dumps: DumpInfo[];
 }
 
