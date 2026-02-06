@@ -28,7 +28,7 @@ export function ChangeFailureRateChart({ data }: Props) {
 
   return (
     <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
           <XAxis
@@ -63,13 +63,6 @@ export function ChangeFailureRateChart({ data }: Props) {
             }}
           />
           <Legend />
-          <Bar
-            yAxisId="left"
-            dataKey="total_deployments"
-            fill="#3b82f6"
-            name="Total Deployments"
-            radius={[4, 4, 0, 0]}
-          />
           <Bar
             yAxisId="left"
             dataKey="failed_deployments"
