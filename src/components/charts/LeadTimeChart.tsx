@@ -1,19 +1,21 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
+  Legend,
+  Area,
+  ComposedChart,
 } from "recharts";
-import type { LeadTimeForChanges } from "@/types";
+import type { LeadTimePeriodStats } from "@/types";
 
 interface Props {
-  data: LeadTimeForChanges[];
+  data: LeadTimePeriodStats[];
 }
 
 export function LeadTimeChart({ data }: Props) {
@@ -25,28 +27,27 @@ export function LeadTimeChart({ data }: Props) {
     );
   }
 
-  const chartData = data.slice(0, 15).map((item) => ({
-    name: `#${item.pr_number}`,
-    hours: item.lead_time_hours,
-    title: item.title,
+  // Build chart data with sigma band as [minus_sigma, plus_sigma] for Area
+  const chartData = data.map((item) => ({
+    period: item.period,
+    avg: item.avg_hours,
+    sigma_band: [item.minus_sigma, item.plus_sigma] as [number, number],
+    plus_sigma: item.plus_sigma,
+    minus_sigma: item.minus_sigma,
+    stddev: item.stddev_hours,
+    count: item.count,
   }));
-
-  const getBarColor = (hours: number) => {
-    if (hours < 24) return "#22c55e"; // green - less than 1 day
-    if (hours < 72) return "#eab308"; // yellow - 1-3 days
-    return "#ef4444"; // red - more than 3 days
-  };
 
   return (
     <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ComposedChart
           data={chartData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
           <XAxis
-            dataKey="name"
+            dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
           />
@@ -67,29 +68,53 @@ export function LeadTimeChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
-            formatter={(value, _name, props) => [
-              `${value} hours`,
-              (props.payload as { title: string }).title.substring(0, 50),
-            ]}
+            formatter={(value, name) => {
+              if (name === "sigma_band") return null;
+              if (name === "Avg") return [`${value}h`, name];
+              if (name === "+σ") return [`${value}h`, name];
+              if (name === "-σ") return [`${value}h`, name];
+              return [value, name];
+            }}
+            itemSorter={() => 0}
           />
-          <Bar dataKey="hours" name="Lead Time" radius={[4, 4, 0, 0]}>
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry.hours)} />
-            ))}
-          </Bar>
-        </BarChart>
+          <Legend />
+          <Area
+            type="monotone"
+            dataKey="sigma_band"
+            fill="#3b82f6"
+            fillOpacity={0.1}
+            stroke="none"
+            name="sigma_band"
+            legendType="none"
+          />
+          <Line
+            type="monotone"
+            dataKey="plus_sigma"
+            stroke="#93c5fd"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="+σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="minus_sigma"
+            stroke="#93c5fd"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="-σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="avg"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            dot={{ fill: "#3b82f6", r: 3 }}
+            name="Avg"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
-      <div className="flex justify-center gap-4 mt-2 text-xs">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-green-500 rounded" /> &lt; 24h
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-yellow-500 rounded" /> 24-72h
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-red-500 rounded" /> &gt; 72h
-        </span>
-      </div>
     </div>
   );
 }
