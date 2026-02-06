@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getRepositories } from "@/lib/data";
-import { RepositorySelector, UpdateButton, DeleteButton } from "@/components/ui";
+import { RepositorySelector, DeleteButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -45,30 +45,24 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {repositories.map((repo) => {
-              const [owner, repoName] = repo.displayName.includes("/")
-                ? repo.displayName.split("/")
-                : [repo.name.split("__")[0], repo.name.split("__")[1]];
-              return (
-                <div
-                  key={repo.name}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                >
-                  <Link href={`/${repo.name}`} className="block mb-3">
-                    <h3 className="font-semibold mb-1">{repo.displayName}</h3>
-                    {repo.lastCollected && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Last collected: {formatTimestamp(repo.lastCollected)}
-                      </p>
-                    )}
-                  </Link>
-                  <div className="flex items-center gap-2">
-                    <UpdateButton owner={owner} repo={repoName} />
-                    <DeleteButton repoKey={repo.name} repoName={repo.displayName} />
-                  </div>
+            {repositories.map((repo) => (
+              <div
+                key={repo.name}
+                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-blue-400 dark:hover:border-blue-500 transition-colors flex items-center justify-between"
+              >
+                <Link href={`/${repo.name}`} className="block min-w-0 flex-1">
+                  <h3 className="font-semibold mb-1">{repo.displayName}</h3>
+                  {repo.lastCollected && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Last collected: {formatTimestamp(repo.lastCollected)}
+                    </p>
+                  )}
+                </Link>
+                <div className="ml-3 shrink-0">
+                  <DeleteButton repoKey={repo.name} repoName={repo.displayName} />
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </section>
