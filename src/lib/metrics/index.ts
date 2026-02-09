@@ -9,6 +9,7 @@ import type {
   RevertRate,
   PRSize,
   PickupTime,
+  PeriodStats,
   DORAMetrics,
   PeriodGranularity,
   PeriodMetrics,
@@ -59,13 +60,16 @@ export function calculateDORAMetrics(
     change_failure_rate: calculateChangeFailureRate(pulls, granularity),
     revert_rate: calculateRevertRate(commits, granularity),
     pr_size: calculatePRSize(pulls),
+    pr_size_stats: calculatePRSizeStats(pulls, granularity),
     pickup_time: calculatePickupTime(pulls, reviews),
+    pickup_time_stats: calculatePickupTimeStats(pulls, reviews, granularity),
   };
 }
 
 export function calculateAllPeriodMetrics(
   pulls: PullRequest[],
-  commits: Commit[]
+  commits: Commit[],
+  reviews: Review[] = []
 ): Record<PeriodGranularity, PeriodMetrics> {
   const granularities: PeriodGranularity[] = ["day", "week", "month"];
   const result = {} as Record<PeriodGranularity, PeriodMetrics>;
@@ -76,6 +80,8 @@ export function calculateAllPeriodMetrics(
       lead_time_stats: calculateLeadTimeStats(pulls, g),
       change_failure_rate: calculateChangeFailureRate(pulls, g),
       revert_rate: calculateRevertRate(commits, g),
+      pr_size_stats: calculatePRSizeStats(pulls, g),
+      pickup_time_stats: calculatePickupTimeStats(pulls, reviews, g),
     };
   }
 
@@ -311,6 +317,106 @@ function calculatePickupTime(pulls: PullRequest[], reviews: Review[]): PickupTim
       (a, b) =>
         new Date(b.first_review_at).getTime() - new Date(a.first_review_at).getTime()
     );
+}
+
+function calculatePRSizeStats(
+  pulls: PullRequest[],
+  granularity: PeriodGranularity = "week"
+): PeriodStats[] {
+  const mergedPRs = pulls.filter(
+    (pr) => pr.merged_at && pr.additions !== undefined && pr.deletions !== undefined
+  );
+
+  const periodValues = new Map<string, number[]>();
+
+  for (const pr of mergedPRs) {
+    const mergedAt = new Date(pr.merged_at!);
+    const key = getPeriodKey(mergedAt, granularity);
+    const totalLines = pr.additions! + pr.deletions!;
+
+    const arr = periodValues.get(key) || [];
+    arr.push(totalLines);
+    periodValues.set(key, arr);
+  }
+
+  const result: PeriodStats[] = [];
+  for (const [period, values] of periodValues) {
+    const count = values.length;
+    const avg = values.reduce((s, v) => s + v, 0) / count;
+    const variance =
+      count > 1
+        ? values.reduce((s, v) => s + (v - avg) ** 2, 0) / (count - 1)
+        : 0;
+    const stddev = Math.sqrt(variance);
+
+    result.push({
+      period,
+      avg: Math.round(avg * 10) / 10,
+      stddev: Math.round(stddev * 10) / 10,
+      plus_sigma: Math.round((avg + stddev) * 10) / 10,
+      minus_sigma: Math.round(Math.max(0, avg - stddev) * 10) / 10,
+      count,
+    });
+  }
+
+  return result.sort((a, b) => a.period.localeCompare(b.period));
+}
+
+function calculatePickupTimeStats(
+  pulls: PullRequest[],
+  reviews: Review[],
+  granularity: PeriodGranularity = "week"
+): PeriodStats[] {
+  const mergedPRs = pulls.filter((pr) => pr.merged_at);
+
+  // Build a map of pr_number → first human review
+  const firstReviewMap = new Map<number, string>();
+  for (const review of reviews) {
+    if (review.user_type === "Bot") continue;
+    const existing = firstReviewMap.get(review.pr_number);
+    if (!existing || new Date(review.submitted_at) < new Date(existing)) {
+      firstReviewMap.set(review.pr_number, review.submitted_at);
+    }
+  }
+
+  // Group pickup times by period
+  const periodValues = new Map<string, number[]>();
+
+  for (const pr of mergedPRs) {
+    const firstReviewAt = firstReviewMap.get(pr.number);
+    if (!firstReviewAt) continue;
+
+    const reviewDate = new Date(firstReviewAt);
+    const key = getPeriodKey(reviewDate, granularity);
+    const createdAt = new Date(pr.created_at);
+    const hours = Math.max(0, (reviewDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+
+    const arr = periodValues.get(key) || [];
+    arr.push(hours);
+    periodValues.set(key, arr);
+  }
+
+  const result: PeriodStats[] = [];
+  for (const [period, values] of periodValues) {
+    const count = values.length;
+    const avg = values.reduce((s, v) => s + v, 0) / count;
+    const variance =
+      count > 1
+        ? values.reduce((s, v) => s + (v - avg) ** 2, 0) / (count - 1)
+        : 0;
+    const stddev = Math.sqrt(variance);
+
+    result.push({
+      period,
+      avg: Math.round(avg * 10) / 10,
+      stddev: Math.round(stddev * 10) / 10,
+      plus_sigma: Math.round((avg + stddev) * 10) / 10,
+      minus_sigma: Math.round(Math.max(0, avg - stddev) * 10) / 10,
+      count,
+    });
+  }
+
+  return result.sort((a, b) => a.period.localeCompare(b.period));
 }
 
 // 統計サマリー計算

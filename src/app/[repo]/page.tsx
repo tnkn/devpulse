@@ -28,7 +28,7 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
     data.commits,
     data.reviews
   );
-  const allPeriodMetrics = calculateAllPeriodMetrics(data.pulls, data.commits);
+  const allPeriodMetrics = calculateAllPeriodMetrics(data.pulls, data.commits, data.reviews);
   const summary = calculateSummary(metrics);
 
   return (
