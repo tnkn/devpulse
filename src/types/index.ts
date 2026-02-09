@@ -133,6 +133,15 @@ export interface PickupTime {
   first_review_at: string;
 }
 
+export interface PeriodStats {
+  period: string;
+  avg: number;
+  stddev: number;
+  plus_sigma: number;
+  minus_sigma: number;
+  count: number;
+}
+
 export interface DORAMetrics {
   deployment_frequency: DeploymentFrequency[];
   lead_time_for_changes: LeadTimeForChanges[];
@@ -140,7 +149,9 @@ export interface DORAMetrics {
   change_failure_rate: ChangeFailureRate[];
   revert_rate: RevertRate[];
   pr_size: PRSize[];
+  pr_size_stats: PeriodStats[];
   pickup_time: PickupTime[];
+  pickup_time_stats: PeriodStats[];
 }
 
 export type PeriodGranularity = "day" | "week" | "month";
@@ -150,6 +161,8 @@ export interface PeriodMetrics {
   lead_time_stats: LeadTimePeriodStats[];
   change_failure_rate: ChangeFailureRate[];
   revert_rate: RevertRate[];
+  pr_size_stats: PeriodStats[];
+  pickup_time_stats: PeriodStats[];
 }
 
 // GitHub API 型定義

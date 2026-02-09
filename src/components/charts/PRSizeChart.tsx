@@ -1,58 +1,51 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
-  ReferenceLine,
+  Legend,
+  Area,
+  ComposedChart,
 } from "recharts";
-import type { PRSize } from "@/types";
+import type { PeriodStats } from "@/types";
 
 interface Props {
-  data: PRSize[];
+  data: PeriodStats[];
 }
 
 export function PRSizeChart({ data }: Props) {
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No PR size data available (run Update to fetch)
+        No PR size data available
       </div>
     );
   }
 
-  const chartData = data.slice(0, 20).map((item) => ({
-    name: `#${item.pr_number}`,
-    loc: item.total_lines,
-    title: item.title,
-    additions: item.additions,
-    deletions: item.deletions,
+  const chartData = data.map((item) => ({
+    period: item.period,
+    avg: item.avg,
+    sigma_band: [item.minus_sigma, item.plus_sigma] as [number, number],
+    plus_sigma: item.plus_sigma,
+    minus_sigma: item.minus_sigma,
+    stddev: item.stddev,
+    count: item.count,
   }));
-
-  const avgLoc =
-    chartData.reduce((sum, item) => sum + item.loc, 0) / chartData.length;
-
-  const getBarColor = (loc: number) => {
-    if (loc < 200) return "#22c55e"; // green
-    if (loc <= 500) return "#eab308"; // yellow
-    return "#ef4444"; // red
-  };
 
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-        <BarChart
+        <ComposedChart
           data={chartData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
           <XAxis
-            dataKey="name"
+            dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
           />
@@ -73,43 +66,53 @@ export function PRSizeChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
-            formatter={(_value, _name, props) => {
-              const p = props.payload as { title: string; additions: number; deletions: number; loc: number };
-              return [
-                `${p.loc} LOC (+${p.additions} -${p.deletions})`,
-                p.title.substring(0, 50),
-              ];
+            formatter={(value, name) => {
+              if (name === "sigma_band") return null;
+              if (name === "Avg") return [`${value} LOC`, name];
+              if (name === "+σ") return [`${value} LOC`, name];
+              if (name === "-σ") return [`${value} LOC`, name];
+              return [value, name];
             }}
+            itemSorter={() => 0}
           />
-          <ReferenceLine
-            y={avgLoc}
-            stroke="#8b5cf6"
-            strokeDasharray="5 5"
-            label={{
-              value: `Avg: ${Math.round(avgLoc)} LOC`,
-              position: "right",
-              fill: "#8b5cf6",
-              fontSize: 12,
-            }}
+          <Legend />
+          <Area
+            type="monotone"
+            dataKey="sigma_band"
+            fill="#22c55e"
+            fillOpacity={0.1}
+            stroke="none"
+            name="sigma_band"
+            legendType="none"
           />
-          <Bar dataKey="loc" name="LOC" radius={[4, 4, 0, 0]}>
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry.loc)} />
-            ))}
-          </Bar>
-        </BarChart>
+          <Line
+            type="monotone"
+            dataKey="plus_sigma"
+            stroke="#86efac"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="+σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="minus_sigma"
+            stroke="#86efac"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="-σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="avg"
+            stroke="#22c55e"
+            strokeWidth={2}
+            dot={{ fill: "#22c55e", r: 3 }}
+            name="Avg"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
-      <div className="flex justify-center gap-4 mt-2 text-xs">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-green-500 rounded" /> &lt; 200
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-yellow-500 rounded" /> 200-500
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-red-500 rounded" /> &gt; 500
-        </span>
-      </div>
     </div>
   );
 }

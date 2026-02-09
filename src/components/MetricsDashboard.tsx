@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { DORAMetrics, PeriodGranularity, PeriodMetrics, DeploymentFrequency, RevertRate, LeadTimePeriodStats } from "@/types";
+import type { DORAMetrics, PeriodGranularity, PeriodMetrics, DeploymentFrequency, RevertRate, LeadTimePeriodStats, PeriodStats } from "@/types";
 import {
   DeploymentFrequencyChart,
   LeadTimeChart,
@@ -58,6 +58,8 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName }: Props)
       lead_time_stats: pm.lead_time_stats,
       change_failure_rate: pm.change_failure_rate,
       revert_rate: pm.revert_rate,
+      pr_size_stats: pm.pr_size_stats,
+      pickup_time_stats: pm.pickup_time_stats,
     };
   }, [metrics, allPeriodMetrics, granularity]);
 
@@ -102,8 +104,14 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName }: Props)
       pr_size: activeMetrics.pr_size.filter((item) =>
         isInRange(item.merged_at)
       ),
+      pr_size_stats: activeMetrics.pr_size_stats.filter((item) =>
+        isPeriodInRange(item.period)
+      ),
       pickup_time: activeMetrics.pickup_time.filter((item) =>
         isInRange(item.first_review_at)
+      ),
+      pickup_time_stats: activeMetrics.pickup_time_stats.filter((item) =>
+        isPeriodInRange(item.period)
       ),
     };
   }, [activeMetrics, dateRange]);
@@ -169,12 +177,12 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName }: Props)
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <h3 className="text-lg font-medium mb-4">PR Size (LOC)</h3>
-            <PRSizeChart data={filteredMetrics.pr_size} />
+            <PRSizeChart data={filteredMetrics.pr_size_stats} />
           </div>
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <h3 className="text-lg font-medium mb-4">Pick-up Time</h3>
-            <PickupTimeChart data={filteredMetrics.pickup_time} />
+            <PickupTimeChart data={filteredMetrics.pickup_time_stats} />
           </div>
         </div>
       </section>

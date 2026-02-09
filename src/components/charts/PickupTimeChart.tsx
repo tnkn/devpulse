@@ -1,56 +1,51 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
-  ReferenceLine,
+  Legend,
+  Area,
+  ComposedChart,
 } from "recharts";
-import type { PickupTime } from "@/types";
+import type { PeriodStats } from "@/types";
 
 interface Props {
-  data: PickupTime[];
+  data: PeriodStats[];
 }
 
 export function PickupTimeChart({ data }: Props) {
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No review data available (run Update to fetch)
+        No review data available
       </div>
     );
   }
 
-  const chartData = data.slice(0, 20).map((item) => ({
-    name: `#${item.pr_number}`,
-    hours: item.pickup_time_hours,
-    title: item.title,
+  const chartData = data.map((item) => ({
+    period: item.period,
+    avg: item.avg,
+    sigma_band: [item.minus_sigma, item.plus_sigma] as [number, number],
+    plus_sigma: item.plus_sigma,
+    minus_sigma: item.minus_sigma,
+    stddev: item.stddev,
+    count: item.count,
   }));
-
-  const avgHours =
-    chartData.reduce((sum, item) => sum + item.hours, 0) / chartData.length;
-
-  const getBarColor = (hours: number) => {
-    if (hours < 4) return "#22c55e"; // green
-    if (hours <= 24) return "#eab308"; // yellow
-    return "#ef4444"; // red
-  };
 
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-        <BarChart
+        <ComposedChart
           data={chartData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
           <XAxis
-            dataKey="name"
+            dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
           />
@@ -71,40 +66,53 @@ export function PickupTimeChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
-            formatter={(value, _name, props) => [
-              `${value} hours`,
-              (props.payload as { title: string }).title.substring(0, 50),
-            ]}
-          />
-          <ReferenceLine
-            y={avgHours}
-            stroke="#8b5cf6"
-            strokeDasharray="5 5"
-            label={{
-              value: `Avg: ${avgHours.toFixed(1)}h`,
-              position: "right",
-              fill: "#8b5cf6",
-              fontSize: 12,
+            formatter={(value, name) => {
+              if (name === "sigma_band") return null;
+              if (name === "Avg") return [`${value}h`, name];
+              if (name === "+σ") return [`${value}h`, name];
+              if (name === "-σ") return [`${value}h`, name];
+              return [value, name];
             }}
+            itemSorter={() => 0}
           />
-          <Bar dataKey="hours" name="Pick-up Time" radius={[4, 4, 0, 0]}>
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry.hours)} />
-            ))}
-          </Bar>
-        </BarChart>
+          <Legend />
+          <Area
+            type="monotone"
+            dataKey="sigma_band"
+            fill="#f59e0b"
+            fillOpacity={0.1}
+            stroke="none"
+            name="sigma_band"
+            legendType="none"
+          />
+          <Line
+            type="monotone"
+            dataKey="plus_sigma"
+            stroke="#fcd34d"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="+σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="minus_sigma"
+            stroke="#fcd34d"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            name="-σ"
+          />
+          <Line
+            type="monotone"
+            dataKey="avg"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            dot={{ fill: "#f59e0b", r: 3 }}
+            name="Avg"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
-      <div className="flex justify-center gap-4 mt-2 text-xs">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-green-500 rounded" /> &lt; 4h
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-yellow-500 rounded" /> 4-24h
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-red-500 rounded" /> &gt; 24h
-        </span>
-      </div>
     </div>
   );
 }
