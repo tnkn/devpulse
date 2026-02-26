@@ -24,8 +24,8 @@ export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): 
 export async function upsertPullRequests(conn: DuckDBConnection, prs: PullRequest[]): Promise<void> {
   if (prs.length === 0) return;
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
   );
   for (const pr of prs) {
     stmt.bindInteger(1, pr.number);
@@ -44,6 +44,7 @@ export async function upsertPullRequests(conn: DuckDBConnection, prs: PullReques
     if (pr.ci_failed !== undefined) stmt.bindBoolean(14, pr.ci_failed); else stmt.bindNull(14);
     if (pr.additions !== undefined) stmt.bindInteger(15, pr.additions); else stmt.bindNull(15);
     if (pr.deletions !== undefined) stmt.bindInteger(16, pr.deletions); else stmt.bindNull(16);
+    if (pr.user_login) stmt.bindVarchar(17, pr.user_login); else stmt.bindNull(17);
     await stmt.run();
   }
   stmt.destroySync();
@@ -125,6 +126,7 @@ export async function upsertMetadata(
   conn: DuckDBConnection,
   fullName: string,
   repositoryUrl: string,
+  tokenId?: string | null,
 ): Promise<void> {
   const reader = await conn.runAndReadAll(`
     SELECT
@@ -140,8 +142,8 @@ export async function upsertMetadata(
   const ic = Number(rows[0][3]);
 
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`
+    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
   );
   stmt.bindVarchar(1, fullName);
   stmt.bindVarchar(2, repositoryUrl);
@@ -150,6 +152,11 @@ export async function upsertMetadata(
   stmt.bindInteger(5, prc);
   stmt.bindInteger(6, rc);
   stmt.bindInteger(7, ic);
+  if (tokenId) {
+    stmt.bindVarchar(8, tokenId);
+  } else {
+    stmt.bindNull(8);
+  }
   await stmt.run();
   stmt.destroySync();
 }

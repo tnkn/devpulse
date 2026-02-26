@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS metadata (
   commit_count INTEGER DEFAULT 0,
   pull_request_count INTEGER DEFAULT 0,
   release_count INTEGER DEFAULT 0,
-  issue_count INTEGER DEFAULT 0
+  issue_count INTEGER DEFAULT 0,
+  token_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS commits (
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS pull_requests (
   labels_json TEXT DEFAULT '[]',
   ci_failed BOOLEAN,
   additions INTEGER,
-  deletions INTEGER
+  deletions INTEGER,
+  user_login TEXT
 );
 
 CREATE TABLE IF NOT EXISTS releases (
@@ -72,6 +74,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 export const MIGRATION_DDL = `
 ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS additions INTEGER;
 ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS deletions INTEGER;
+ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS user_login TEXT;
+ALTER TABLE metadata ADD COLUMN IF NOT EXISTS token_id TEXT;
 
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY,
@@ -80,5 +84,19 @@ CREATE TABLE IF NOT EXISTS reviews (
   user_type TEXT NOT NULL,
   state TEXT NOT NULL,
   submitted_at TEXT NOT NULL
+);
+`;
+
+export const TOKEN_SCHEMA_DDL = `
+CREATE TABLE IF NOT EXISTS github_tokens (
+  id              TEXT PRIMARY KEY,
+  label           TEXT NOT NULL,
+  encrypted_token TEXT NOT NULL,
+  iv              TEXT NOT NULL,
+  auth_tag        TEXT NOT NULL,
+  token_suffix    TEXT NOT NULL,
+  is_default      BOOLEAN DEFAULT FALSE,
+  created_at      TEXT DEFAULT (strftime(now(), '%Y-%m-%dT%H:%M:%SZ')),
+  updated_at      TEXT DEFAULT (strftime(now(), '%Y-%m-%dT%H:%M:%SZ'))
 );
 `;
