@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { getRepoData } from "@/lib/data";
 import { calculateDORAMetrics, calculateAllPeriodMetrics, calculateSummary } from "@/lib/metrics";
 import { MetricsDashboard } from "@/components/MetricsDashboard";
-import { UpdateButton, DeleteButton } from "@/components/ui";
+import { UpdateButton, DeleteButton, LocaleToggle } from "@/components/ui";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import { formatTimestamp } from "@/lib/i18n/format";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +32,15 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
   );
   const allPeriodMetrics = calculateAllPeriodMetrics(data.pulls, data.commits, data.reviews);
   const summary = calculateSummary(metrics);
+  const locale = await getLocale();
+  const t = await getMessages();
 
   return (
     <main className="min-h-screen p-8">
       <header className="mb-8">
         <nav className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           <Link href="/" className="hover:underline">
-            Home
+            {t.common.home}
           </Link>
           <span className="mx-2">/</span>
           <span>{data.metadata.repository}</span>
@@ -44,9 +48,11 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">{data.metadata.repository}</h1>
           <div className="flex items-center gap-2">
+            <LocaleToggle />
             <UpdateButton
               owner={data.metadata.repository.split("/")[0]}
               repo={data.metadata.repository.split("/")[1]}
+              tokenId={data.metadata.token_id}
             />
             <DeleteButton
               repoKey={decodedRepo}
@@ -55,66 +61,66 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
           </div>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          Last collected: {formatTimestamp(data.metadata.dumped_at)}
+          {t.common.lastCollected}: {formatTimestamp(data.metadata.dumped_at, locale)}
         </p>
       </header>
 
       {/* Summary Cards */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">DORA Metrics Summary</h2>
+        <h2 className="text-xl font-semibold mb-4">{t.repo.doraSummary}</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <SummaryCard
-            title="Deployment Frequency"
+            title={t.repo.deploymentFrequency}
             value={summary.total_deployments.toString()}
-            unit="merges"
-            description="Total PR merges"
+            unit={t.repo.merges}
+            description={t.repo.totalPrMerges}
           />
           <SummaryCard
-            title="Lead Time"
+            title={t.repo.leadTimeForChanges}
             value={summary.avg_lead_time_hours.toString()}
-            unit="hours"
-            description="Average PR merge time"
+            unit={t.repo.hours}
+            description={t.repo.avgPrMergeTime}
           />
           <SummaryCard
-            title="Change Failure Rate"
+            title={t.repo.changeFailureRate}
             value={`${summary.avg_failure_rate}%`}
             unit=""
-            description="Average failure rate"
+            description={t.repo.avgFailureRate}
           />
           <SummaryCard
-            title="Revert Rate"
+            title={t.repo.revertRate}
             value={`${summary.avg_revert_rate}%`}
             unit=""
-            description="Average revert commit rate"
+            description={t.repo.avgRevertRate}
           />
           <SummaryCard
-            title="PR Size"
+            title={t.repo.changeSize}
             value={summary.avg_pr_size.toString()}
-            unit="LOC"
-            description="Average lines changed"
+            unit={t.repo.loc}
+            description={t.repo.avgLinesChanged}
           />
           <SummaryCard
-            title="Pick-up Time"
+            title={t.repo.timeToFirstReview}
             value={summary.avg_pickup_time_hours.toString()}
-            unit="hours"
-            description="Average time to first review"
+            unit={t.repo.hours}
+            description={t.repo.avgTimeToFirstReview}
           />
         </div>
       </section>
 
       {/* Data Overview */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Data Overview</h2>
+        <h2 className="text-xl font-semibold mb-4">{t.repo.dataOverview}</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <DataCard title="Commits" count={data.commits.length} />
-          <DataCard title="Pull Requests" count={data.pulls.length} />
-          <DataCard title="Releases" count={data.releases.length} />
-          <DataCard title="Issues" count={data.issues.length} />
+          <DataCard title={t.repo.commits} count={data.commits.length} />
+          <DataCard title={t.repo.pullRequests} count={data.pulls.length} />
+          <DataCard title={t.repo.releases} count={data.releases.length} />
+          <DataCard title={t.repo.issues} count={data.issues.length} />
         </div>
       </section>
 
       {/* Interactive Dashboard */}
-      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} />
+      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} pulls={data.pulls} reviews={data.reviews} />
     </main>
   );
 }
@@ -149,19 +155,4 @@ function DataCard({ title, count }: { title: string; count: number }) {
       <p className="text-xl font-semibold">{count.toLocaleString()}</p>
     </div>
   );
-}
-
-function formatTimestamp(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
 }
