@@ -131,10 +131,8 @@ export async function getDb(repoKey: string): Promise<DuckDBInstance> {
   const conn = await instance.connect();
   await initSchema(conn);
 
-  // Run migrations for existing DBs (ADD COLUMN IF NOT EXISTS — safe to run always)
-  if (!isNew) {
-    await runMigrations(conn);
-  }
+  // Run migrations (ADD COLUMN IF NOT EXISTS — safe to run always)
+  await runMigrations(conn);
 
   // Auto-migrate from JSON if this is a new DB
   if (isNew) {

@@ -2,6 +2,7 @@ import type { CollectionJob } from "@/types";
 import { getCommits, getPullRequests, getReleases, getIssues, getCommitCheckFailed, getPullRequestDetail, getPullRequestReviews } from "./client";
 import { getConnection, checkpoint } from "@/lib/db";
 import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata, updatePRSize, upsertReviews } from "@/lib/db/upsert";
+import { getDecryptedToken } from "@/lib/tokens";
 
 const globalJobs = globalThis as unknown as {
   __dev_vis_jobs?: Map<string, CollectionJob>;
@@ -15,7 +16,7 @@ function generateJobId(): string {
   return `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function startCollection(owner: string, repo: string): CollectionJob {
+export function startCollection(owner: string, repo: string, tokenId?: string): CollectionJob {
   const id = generateJobId();
   const job: CollectionJob = {
     id,
@@ -27,6 +28,7 @@ export function startCollection(owner: string, repo: string): CollectionJob {
     completed_at: null,
     error: null,
     dump_path: null,
+    token_id: tokenId || null,
   };
 
   jobs.set(id, job);
@@ -41,6 +43,26 @@ export function startCollection(owner: string, repo: string): CollectionJob {
 
 export function getJob(id: string): CollectionJob | undefined {
   return jobs.get(id);
+}
+
+const ENV_TOKEN_ID = "env";
+
+async function resolveJobToken(tokenId?: string | null): Promise<string | undefined> {
+  if (!tokenId) return undefined; // will use default resolution in client
+
+  // Explicit env var token
+  if (tokenId === ENV_TOKEN_ID) {
+    const envToken = process.env.GITHUB_TOKEN;
+    if (!envToken) throw new Error("GITHUB_TOKEN environment variable is not set");
+    return envToken;
+  }
+
+  try {
+    const token = await getDecryptedToken(tokenId);
+    return token || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function getLatestTimestamps(repoKey: string): Promise<{
@@ -77,6 +99,9 @@ async function runCollection(job: CollectionJob): Promise<void> {
   try {
     job.status = "collecting";
 
+    // Resolve the token for this job
+    const token = await resolveJobToken(job.token_id);
+
     // Get latest timestamps for differential fetch
     job.progress = "Checking existing data...";
     const timestamps = await getLatestTimestamps(repoKey);
@@ -90,22 +115,22 @@ async function runCollection(job: CollectionJob): Promise<void> {
 
     // Collect commits (supports `since`)
     job.progress = "Collecting commits...";
-    const newCommits = await getCommits(owner, repo, timestamps.commitSince ? { since: timestamps.commitSince } : undefined);
+    const newCommits = await getCommits(owner, repo, timestamps.commitSince ? { since: timestamps.commitSince, token } : { token });
     console.log(`[collector] Fetched ${newCommits.length} commits`);
 
     // Collect pull requests (uses updated_at cutoff)
     job.progress = "Collecting pull requests...";
-    const newPulls = await getPullRequests(owner, repo, timestamps.prSince ? { since: timestamps.prSince } : undefined);
+    const newPulls = await getPullRequests(owner, repo, timestamps.prSince ? { since: timestamps.prSince, token } : { token });
     console.log(`[collector] Fetched ${newPulls.length} pull requests`);
 
     // Collect releases (always full fetch, typically small)
     job.progress = "Collecting releases...";
-    const newReleases = await getReleases(owner, repo);
+    const newReleases = await getReleases(owner, repo, token);
     console.log(`[collector] Fetched ${newReleases.length} releases`);
 
     // Collect issues (supports `since`)
     job.progress = "Collecting issues...";
-    const newIssues = await getIssues(owner, repo, timestamps.issueSince ? { since: timestamps.issueSince } : undefined);
+    const newIssues = await getIssues(owner, repo, timestamps.issueSince ? { since: timestamps.issueSince, token } : { token });
     console.log(`[collector] Fetched ${newIssues.length} issues`);
 
     // Upsert into DuckDB
@@ -118,7 +143,6 @@ async function runCollection(job: CollectionJob): Promise<void> {
       await upsertIssues(conn, newIssues);
 
       // Collect CI status for merged PRs that don't have ci_failed yet
-      // This is optional — skip gracefully if the token lacks Checks permission
       try {
         const ciReader = await conn.runAndReadAll(
           "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL"
@@ -132,7 +156,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingCI.length; i += BATCH_SIZE) {
             const batch = prsNeedingCI.slice(i, i + BATCH_SIZE);
             const results = await Promise.all(
-              batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1])))
+              batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1]), token))
             );
             batch.forEach((row, idx) => {
               ciResults.push({ number: Number(row[0]), ci_failed: results[idx] });
@@ -140,7 +164,6 @@ async function runCollection(job: CollectionJob): Promise<void> {
             job.progress = `Checking CI status (${Math.min(i + BATCH_SIZE, prsNeedingCI.length)}/${prsNeedingCI.length})...`;
           }
 
-          // Update CI status in DB
           const stmt = await conn.prepare(
             "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2"
           );
@@ -168,7 +191,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingSize.length; i += BATCH_SIZE) {
             const batch = prsNeedingSize.slice(i, i + BATCH_SIZE);
             const results = await Promise.all(
-              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0])))
+              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0]), token))
             );
             for (let j = 0; j < batch.length; j++) {
               await updatePRSize(conn, Number(batch[j][0]), results[j].additions, results[j].deletions);
@@ -178,6 +201,40 @@ async function runCollection(job: CollectionJob): Promise<void> {
         }
       } catch (sizeErr) {
         console.warn(`[collector] Skipping PR size fetch: ${sizeErr instanceof Error ? sizeErr.message : sizeErr}`);
+      }
+
+      // Backfill user_login for PRs that are missing it
+      try {
+        const loginReader = await conn.runAndReadAll(
+          "SELECT number FROM pull_requests WHERE user_login IS NULL"
+        );
+        const prsNeedingLogin = loginReader.getRows();
+        if (prsNeedingLogin.length > 0) {
+          job.progress = `Backfilling PR authors (0/${prsNeedingLogin.length})...`;
+          const BATCH_SIZE = 10;
+
+          for (let i = 0; i < prsNeedingLogin.length; i += BATCH_SIZE) {
+            const batch = prsNeedingLogin.slice(i, i + BATCH_SIZE);
+            const results = await Promise.all(
+              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0]), token))
+            );
+            for (let j = 0; j < batch.length; j++) {
+              const login = results[j].user_login;
+              if (login) {
+                const ustmt = await conn.prepare(
+                  "UPDATE pull_requests SET user_login = $1 WHERE number = $2"
+                );
+                ustmt.bindVarchar(1, login);
+                ustmt.bindInteger(2, Number(batch[j][0]));
+                await ustmt.run();
+                ustmt.destroySync();
+              }
+            }
+            job.progress = `Backfilling PR authors (${Math.min(i + BATCH_SIZE, prsNeedingLogin.length)}/${prsNeedingLogin.length})...`;
+          }
+        }
+      } catch (loginErr) {
+        console.warn(`[collector] Skipping PR author backfill: ${loginErr instanceof Error ? loginErr.message : loginErr}`);
       }
 
       // Collect reviews for merged PRs that don't have reviews yet
@@ -195,7 +252,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingReviews.length; i += BATCH_SIZE) {
             const batch = prsNeedingReviews.slice(i, i + BATCH_SIZE);
             const reviewBatches = await Promise.all(
-              batch.map((row) => getPullRequestReviews(owner, repo, Number(row[0])))
+              batch.map((row) => getPullRequestReviews(owner, repo, Number(row[0]), token))
             );
             const allReviews = reviewBatches.flat();
             if (allReviews.length > 0) {
@@ -208,8 +265,8 @@ async function runCollection(job: CollectionJob): Promise<void> {
         console.warn(`[collector] Skipping reviews fetch: ${reviewErr instanceof Error ? reviewErr.message : reviewErr}`);
       }
 
-      // Update metadata
-      await upsertMetadata(conn, `${owner}/${repo}`, `https://github.com/${owner}/${repo}`);
+      // Update metadata (with token_id)
+      await upsertMetadata(conn, `${owner}/${repo}`, `https://github.com/${owner}/${repo}`, job.token_id);
     } finally {
       conn.closeSync();
     }

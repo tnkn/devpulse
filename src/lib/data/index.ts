@@ -17,7 +17,7 @@ export async function getRepositories(): Promise<Repository[]> {
     try {
       const conn = await getConnection(key);
       const reader = await conn.runAndReadAll(
-        "SELECT full_name, last_collected_at FROM metadata LIMIT 1"
+        "SELECT full_name, last_collected_at, token_id FROM metadata LIMIT 1"
       );
       const rows = reader.getRows();
       conn.closeSync();
@@ -28,8 +28,11 @@ export async function getRepositories(): Promise<Repository[]> {
       const lastCollected = rows.length > 0 && rows[0][1]
         ? String(rows[0][1])
         : null;
+      const tokenId = rows.length > 0 && rows[0][2]
+        ? String(rows[0][2])
+        : null;
 
-      repositories.push({ name: key, displayName, lastCollected });
+      repositories.push({ name: key, displayName, lastCollected, token_id: tokenId });
     } catch {
       // If DB access fails, still show the repo with minimal info
       repositories.push({
@@ -60,9 +63,9 @@ export async function getRepoData(repoName: string): Promise<{
 
   try {
     const [metaReader, commitReader, prReader, releaseReader, issueReader, reviewReader] = await Promise.all([
-      conn.runAndReadAll("SELECT full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count FROM metadata LIMIT 1"),
+      conn.runAndReadAll("SELECT full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id FROM metadata LIMIT 1"),
       conn.runAndReadAll("SELECT sha, message, author_name, author_email, author_date, committer_name, committer_email, committer_date FROM commits ORDER BY author_date DESC"),
-      conn.runAndReadAll("SELECT number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions FROM pull_requests ORDER BY number DESC"),
+      conn.runAndReadAll("SELECT number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login FROM pull_requests ORDER BY number DESC"),
       conn.runAndReadAll("SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC"),
       conn.runAndReadAll("SELECT number, title, state, created_at, updated_at, closed_at, labels_json FROM issues ORDER BY number DESC"),
       conn.runAndReadAll("SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC"),
@@ -81,6 +84,7 @@ export async function getRepoData(repoName: string): Promise<{
           pull_request_count: Number(metaRows[0][4]),
           release_count: Number(metaRows[0][5]),
           issue_count: Number(metaRows[0][6]),
+          token_id: metaRows[0][7] != null ? String(metaRows[0][7]) : null,
         }
       : null;
 
@@ -108,6 +112,7 @@ export async function getRepoData(repoName: string): Promise<{
       ...(r[13] != null ? { ci_failed: Boolean(r[13]) } : {}),
       ...(r[14] != null ? { additions: Number(r[14]) } : {}),
       ...(r[15] != null ? { deletions: Number(r[15]) } : {}),
+      ...(r[16] != null ? { user_login: String(r[16]) } : {}),
     }));
 
     // Parse releases

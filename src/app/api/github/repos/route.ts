@@ -6,9 +6,11 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1", 10);
   const perPage = parseInt(searchParams.get("per_page") || "20", 10);
   const query = searchParams.get("q") || undefined;
+  const affiliation = searchParams.get("affiliation") || undefined;
+  const tokenId = searchParams.get("token_id") || undefined;
 
   try {
-    const result = await listRepositories(page, perPage, query);
+    const result = await listRepositories(page, perPage, query, affiliation, tokenId);
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

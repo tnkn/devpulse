@@ -43,3 +43,6 @@ next-env.d.ts
 
 # data directory
 /data
+
+# encryption key (auto-generated)
+.encryption_key

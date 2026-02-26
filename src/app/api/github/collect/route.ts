@@ -4,7 +4,7 @@ import { startCollection } from "@/lib/github";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { owner, repo } = body;
+    const { owner, repo, token_id } = body;
 
     if (!owner || !repo) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const job = startCollection(owner, repo);
+    const job = startCollection(owner, repo, token_id);
     return NextResponse.json(job, { status: 202 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

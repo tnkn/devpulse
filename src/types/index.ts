@@ -36,6 +36,7 @@ export interface PullRequest {
   ci_failed?: boolean;
   additions?: number;
   deletions?: number;
+  user_login?: string;
 }
 
 export interface Release {
@@ -75,6 +76,7 @@ export interface DumpMetadata {
   pull_request_count: number;
   release_count: number;
   issue_count: number;
+  token_id?: string | null;
 }
 
 // DORA メトリクス型定義
@@ -190,6 +192,51 @@ export interface CollectionJob {
   completed_at: string | null;
   error: string | null;
   dump_path: string | null;
+  token_id?: string | null;
+}
+
+// 個人毎メトリクス型定義
+
+export interface ContributorSummary {
+  login: string;
+  pr_count: number;
+  commit_count: number;
+  review_count: number;
+}
+
+export interface ContributorPeriodData {
+  period: string;
+  pr_counts: Record<string, number>;
+  commit_counts: Record<string, number>;
+  review_counts: Record<string, number>;
+}
+
+export interface ContributorMetrics {
+  contributors: ContributorSummary[];
+  period_data: ContributorPeriodData[];
+  all_logins: string[];
+}
+
+// トークン管理型定義
+
+export interface GitHubTokenMasked {
+  id: string;
+  label: string;
+  token_suffix: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitHubTokenCreateRequest {
+  label: string;
+  token: string;
+}
+
+export interface TokenListResponse {
+  tokens: GitHubTokenMasked[];
+  allowTokenUI: boolean;
+  hasEnvToken: boolean;
 }
 
 // アプリケーション型定義
@@ -198,4 +245,5 @@ export interface Repository {
   name: string;
   displayName: string;
   lastCollected: string | null;
+  token_id?: string | null;
 }

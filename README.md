@@ -47,11 +47,17 @@ cp .env.sample .env
 
 | 権限 | アクセス | 用途 |
 |---|---|---|
+| **Metadata** | Read | リポジトリ検索・一覧の取得 |
 | **Contents** | Read | コミット履歴の取得 |
 | **Issues** | Read | Issue 履歴の取得 |
-| **Pull requests** | Read | PR 履歴の取得 |
-| **Checks** | Read | CI 結果の取得（Change Failure Rate） |
-| **Commit statuses** | Read | CI ステータスの取得（Change Failure Rate） |
+| **Pull requests** | Read | PR 一覧・詳細（変更行数）・レビュー履歴の取得 |
+| **Checks** | Read | CI 実行結果の取得（Change Failure Rate の算出に**必須**） |
+| **Commit statuses** | Read | CI ステータスの取得（Checks と併用推奨） |
+
+> **注意: Checks 権限がないと Change Failure Rate が常に 0% になります。**
+> 権限が不足している場合、CI ステータスの取得はサイレントにスキップされ、
+> サーバーログに `Skipping CI status check: Token lacks 'Checks: Read' permission` と出力されます。
+> Fine-grained PAT を作成した後からでも、Settings > Developer settings > Fine-grained tokens から権限を追加できます。
 
 #### Classic PAT
 

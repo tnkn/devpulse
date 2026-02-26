@@ -6,25 +6,40 @@ import type {
   Issue,
   Review,
 } from "@/types";
+import { getDecryptedDefaultToken, getAllDecryptedTokens } from "@/lib/tokens";
 
 const GITHUB_API = "https://api.github.com";
 const MAX_PAGES = 100;
 
 export interface FetchOptions {
   since?: string; // ISO 8601 timestamp
+  token?: string; // explicit token to use
 }
 
-function getToken(): string {
+async function resolveToken(explicit?: string): Promise<string> {
+  if (explicit) return explicit;
+
+  // 1. DB default token
+  try {
+    const dbToken = await getDecryptedDefaultToken();
+    if (dbToken) return dbToken;
+  } catch (err) {
+    console.warn("[github] Failed to read token from DB, falling back to env var:", err instanceof Error ? err.message : err);
+  }
+
+  // 2. Environment variable fallback
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
-    throw new Error("GITHUB_TOKEN is not set");
+    throw new Error(
+      "GITHUB_TOKEN is not set. Add a token via Settings or set the GITHUB_TOKEN env var."
+    );
   }
   return token;
 }
 
-function headers(): HeadersInit {
+function makeAuthHeaders(token: string): HeadersInit {
   return {
-    Authorization: `Bearer ${getToken()}`,
+    Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
@@ -36,13 +51,14 @@ function parseNextLink(linkHeader: string | null): string | null {
   return match ? match[1] : null;
 }
 
-async function fetchAllPages<T>(url: string, maxPages = MAX_PAGES): Promise<T[]> {
+async function fetchAllPages<T>(url: string, token?: string, maxPages = MAX_PAGES): Promise<T[]> {
   const results: T[] = [];
   let nextUrl: string | null = url;
   let page = 0;
+  const h = makeAuthHeaders(await resolveToken(token));
 
   while (nextUrl && page < maxPages) {
-    const res = await fetch(nextUrl, { headers: headers() });
+    const res = await fetch(nextUrl, { headers: h });
     if (!res.ok) {
       throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
     }
@@ -63,14 +79,16 @@ async function fetchAllPages<T>(url: string, maxPages = MAX_PAGES): Promise<T[]>
 async function fetchPagesUntil<T>(
   url: string,
   shouldContinue: (item: T) => boolean,
+  token?: string,
   maxPages = MAX_PAGES,
 ): Promise<T[]> {
   const results: T[] = [];
   let nextUrl: string | null = url;
   let page = 0;
+  const h = makeAuthHeaders(await resolveToken(token));
 
   while (nextUrl && page < maxPages) {
-    const res = await fetch(nextUrl, { headers: headers() });
+    const res = await fetch(nextUrl, { headers: h });
     if (!res.ok) {
       throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
     }
@@ -95,19 +113,22 @@ async function fetchPagesUntil<T>(
   return results;
 }
 
-export async function listRepositories(
-  page = 1,
-  perPage = 20,
-  query?: string
+async function listReposWithToken(
+  token: string,
+  perPage: number,
+  query?: string,
+  affiliation?: string,
 ): Promise<{ repositories: GitHubRepository[]; total_count?: number }> {
-  if (query) {
+  const h = makeAuthHeaders(token);
+
+  // When no affiliation filter and searching, use GitHub Search API for speed
+  if (query && !affiliation) {
+    const qualifiers = [encodeURIComponent(query), "in:name"];
     const res = await fetch(
-      `${GITHUB_API}/search/repositories?q=${encodeURIComponent(query)}+in:name&per_page=${perPage}&page=${page}&sort=updated`,
-      { headers: headers() }
+      `${GITHUB_API}/search/repositories?q=${qualifiers.join("+")}&per_page=${perPage}&sort=updated`,
+      { headers: h }
     );
-    if (!res.ok) {
-      throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
-    }
+    if (!res.ok) return { repositories: [], total_count: 0 };
     const data = await res.json();
     return {
       repositories: data.items.map(mapRepository),
@@ -115,15 +136,99 @@ export async function listRepositories(
     };
   }
 
-  const res = await fetch(
-    `${GITHUB_API}/user/repos?per_page=${perPage}&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`,
-    { headers: headers() }
-  );
-  if (!res.ok) {
-    throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+  // Use /user/repos which natively supports the affiliation parameter
+  const aff = affiliation || "owner,collaborator,organization_member";
+  const allRepos: GitHubRepository[] = [];
+  const MAX_PAGES = 5; // up to 500 repos per token
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await fetch(
+      `${GITHUB_API}/user/repos?per_page=100&page=${page}&sort=updated&affiliation=${aff}`,
+      { headers: h }
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    allRepos.push(...data.map(mapRepository));
+    if (data.length < 100) break; // last page
   }
-  const data = await res.json();
-  return { repositories: data.map(mapRepository) };
+
+  // When there's a query + affiliation, filter by name client-side
+  if (query) {
+    const lowerQuery = query.toLowerCase();
+    const filtered = allRepos.filter(r =>
+      r.name.toLowerCase().includes(lowerQuery) ||
+      r.full_name.toLowerCase().includes(lowerQuery)
+    );
+    return { repositories: filtered };
+  }
+
+  return { repositories: allRepos };
+}
+
+export async function listRepositories(
+  page = 1,
+  perPage = 20,
+  query?: string,
+  affiliation?: string,
+  tokenId?: string,
+): Promise<{ repositories: GitHubRepository[]; total_count?: number }> {
+  let tokens: string[];
+
+  if (tokenId) {
+    // Specific token requested
+    const token = await resolveToken(
+      tokenId === "env" ? process.env.GITHUB_TOKEN : undefined
+    );
+    if (tokenId !== "env") {
+      // DB token - decrypt it
+      const { getDecryptedToken } = await import("@/lib/tokens");
+      const dbToken = await getDecryptedToken(tokenId);
+      if (!dbToken) throw new Error("Token not found");
+      tokens = [dbToken];
+    } else {
+      tokens = [token];
+    }
+  } else {
+    // No specific token - use all
+    tokens = await getAllDecryptedTokens();
+    if (tokens.length === 0) {
+      throw new Error(
+        "GITHUB_TOKEN is not set. Add a token via Settings or set the GITHUB_TOKEN env var."
+      );
+    }
+  }
+
+  // Fetch from selected token(s) in parallel
+  const results = await Promise.all(
+    tokens.map((t) => listReposWithToken(t, perPage, query, affiliation))
+  );
+
+  // Merge & deduplicate by repo id
+  const seen = new Set<number>();
+  const merged: GitHubRepository[] = [];
+  let totalCount = 0;
+
+  for (const result of results) {
+    if (result.total_count) totalCount += result.total_count;
+    for (const repo of result.repositories) {
+      if (!seen.has(repo.id)) {
+        seen.add(repo.id);
+        merged.push(repo);
+      }
+    }
+  }
+
+  // Sort by updated_at descending
+  merged.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+  // Server-side pagination for the merged results
+  const start = (page - 1) * perPage;
+  const paged = merged.slice(start, start + perPage);
+
+  return {
+    repositories: paged,
+    total_count: query ? totalCount : merged.length,
+  };
 }
 
 function mapRepository(repo: Record<string, unknown>): GitHubRepository {
@@ -169,6 +274,7 @@ function mapPullRequest(pr: Record<string, unknown>): PullRequest {
   const head = pr.head as Record<string, unknown>;
   const base = pr.base as Record<string, unknown>;
   const labels = pr.labels as Array<Record<string, unknown>>;
+  const user = pr.user as Record<string, unknown> | null;
   return {
     number: pr.number as number,
     title: pr.title as string,
@@ -187,6 +293,7 @@ function mapPullRequest(pr: Record<string, unknown>): PullRequest {
       sha: base.sha as string,
     },
     labels: labels.map((l) => ({ name: l.name as string })),
+    ...(user?.login ? { user_login: user.login as string } : {}),
   };
 }
 
@@ -208,30 +315,32 @@ export async function getCommits(owner: string, repo: string, opts?: FetchOption
   if (opts?.since) {
     url += `&since=${encodeURIComponent(opts.since)}`;
   }
-  const raw = await fetchAllPages<Record<string, unknown>>(url);
+  const raw = await fetchAllPages<Record<string, unknown>>(url, opts?.token);
   return raw.map(mapCommit);
 }
 
 export async function getPullRequests(owner: string, repo: string, opts?: FetchOptions): Promise<PullRequest[]> {
   if (opts?.since) {
-    // PRs API doesn't support `since`, so sort by updated desc and stop at cutoff
     const sinceDate = new Date(opts.since).getTime();
     const raw = await fetchPagesUntil<Record<string, unknown>>(
       `${GITHUB_API}/repos/${owner}/${repo}/pulls?state=all&per_page=100&sort=updated&direction=desc`,
       (item) => new Date(item.updated_at as string).getTime() >= sinceDate,
+      opts?.token,
     );
     console.log(`[pulls] Fetched ${raw.length} updated PRs (since ${opts.since})`);
     return raw.map(mapPullRequest);
   }
   const raw = await fetchAllPages<Record<string, unknown>>(
-    `${GITHUB_API}/repos/${owner}/${repo}/pulls?state=all&per_page=100`
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls?state=all&per_page=100`,
+    opts?.token,
   );
   return raw.map(mapPullRequest);
 }
 
-export async function getReleases(owner: string, repo: string): Promise<Release[]> {
+export async function getReleases(owner: string, repo: string, token?: string): Promise<Release[]> {
   const raw = await fetchAllPages<Record<string, unknown>>(
-    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=100`
+    `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=100`,
+    token,
   );
   return raw.map((r) => ({
     id: r.id as number,
@@ -247,11 +356,13 @@ export async function getReleases(owner: string, repo: string): Promise<Release[
 export async function getCommitCheckFailed(
   owner: string,
   repo: string,
-  ref: string
+  ref: string,
+  token?: string,
 ): Promise<boolean> {
+  const h = makeAuthHeaders(await resolveToken(token));
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/commits/${ref}/check-runs`,
-    { headers: headers() }
+    { headers: h }
   );
   if (res.status === 403) {
     throw new Error(
@@ -270,29 +381,35 @@ export async function getCommitCheckFailed(
 export async function getPullRequestDetail(
   owner: string,
   repo: string,
-  number: number
-): Promise<{ additions: number; deletions: number }> {
+  number: number,
+  token?: string,
+): Promise<{ additions: number; deletions: number; user_login?: string }> {
+  const h = makeAuthHeaders(await resolveToken(token));
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/pulls/${number}`,
-    { headers: headers() }
+    { headers: h }
   );
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
   }
   const data = await res.json();
+  const user = data.user as Record<string, unknown> | null;
   return {
     additions: data.additions as number,
     deletions: data.deletions as number,
+    ...(user?.login ? { user_login: user.login as string } : {}),
   };
 }
 
 export async function getPullRequestReviews(
   owner: string,
   repo: string,
-  number: number
+  number: number,
+  token?: string,
 ): Promise<Review[]> {
   const raw = await fetchAllPages<Record<string, unknown>>(
-    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`
+    `${GITHUB_API}/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`,
+    token,
   );
   return raw.map((r) => {
     const user = r.user as Record<string, unknown>;
@@ -312,7 +429,7 @@ export async function getIssues(owner: string, repo: string, opts?: FetchOptions
   if (opts?.since) {
     url += `&since=${encodeURIComponent(opts.since)}`;
   }
-  const raw = await fetchAllPages<Record<string, unknown>>(url);
+  const raw = await fetchAllPages<Record<string, unknown>>(url, opts?.token);
   // Filter out pull requests (GitHub API returns PRs in issues endpoint)
   return raw.filter((i) => !i.pull_request).map(mapIssue);
 }
