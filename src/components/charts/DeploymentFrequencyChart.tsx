@@ -10,16 +10,19 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { DeploymentFrequency } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   data: DeploymentFrequency[];
 }
 
 export function DeploymentFrequencyChart({ data }: Props) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No deployment data available
+        {t.charts.noDeploymentData}
       </div>
     );
   }
@@ -50,7 +53,7 @@ export function DeploymentFrequencyChart({ data }: Props) {
           <Bar
             dataKey="count"
             fill="#3b82f6"
-            name="Deployments"
+            name={t.charts.deployments}
             radius={[4, 4, 0, 0]}
           />
         </BarChart>

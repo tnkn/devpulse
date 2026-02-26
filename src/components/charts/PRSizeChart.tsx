@@ -12,16 +12,19 @@ import {
   ComposedChart,
 } from "recharts";
 import type { PeriodStats } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   data: PeriodStats[];
 }
 
 export function PRSizeChart({ data }: Props) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No PR size data available
+        {t.charts.noChangeSizeData}
       </div>
     );
   }
@@ -53,7 +56,7 @@ export function PRSizeChart({ data }: Props) {
             className="text-xs"
             tick={{ fill: "currentColor" }}
             label={{
-              value: "LOC",
+              value: t.charts.loc,
               angle: -90,
               position: "insideLeft",
               style: { fill: "currentColor" },
@@ -68,9 +71,9 @@ export function PRSizeChart({ data }: Props) {
             labelStyle={{ color: "var(--foreground)" }}
             formatter={(value, name) => {
               if (name === "sigma_band") return null;
-              if (name === "Avg") return [`${value} LOC`, name];
-              if (name === "+σ") return [`${value} LOC`, name];
-              if (name === "-σ") return [`${value} LOC`, name];
+              if (name === "Avg") return [`${value} ${t.charts.loc}`, name];
+              if (name === "+\u03C3") return [`${value} ${t.charts.loc}`, name];
+              if (name === "-\u03C3") return [`${value} ${t.charts.loc}`, name];
               return [value, name];
             }}
             itemSorter={() => 0}
@@ -92,7 +95,7 @@ export function PRSizeChart({ data }: Props) {
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}
-            name="+σ"
+            name="+&#963;"
           />
           <Line
             type="monotone"
@@ -101,7 +104,7 @@ export function PRSizeChart({ data }: Props) {
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}
-            name="-σ"
+            name="-&#963;"
           />
           <Line
             type="monotone"

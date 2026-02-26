@@ -12,16 +12,19 @@ import {
   Legend,
 } from "recharts";
 import type { RevertRate } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   data: RevertRate[];
 }
 
 export function RevertRateChart({ data }: Props) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No commit data available
+        {t.charts.noCommitData}
       </div>
     );
   }
@@ -58,7 +61,7 @@ export function RevertRateChart({ data }: Props) {
             }}
             labelStyle={{ color: "var(--foreground)" }}
             formatter={(value, name) => {
-              if (name === "Revert Rate") return [`${value}%`, name];
+              if (name === t.charts.revertRate) return [`${value}%`, name];
               return [value, name];
             }}
           />
@@ -67,7 +70,7 @@ export function RevertRateChart({ data }: Props) {
             yAxisId="left"
             dataKey="revert_commits"
             fill="#f97316"
-            name="Reverts"
+            name={t.charts.revertsLabel}
             radius={[4, 4, 0, 0]}
           />
           <Line
@@ -76,7 +79,7 @@ export function RevertRateChart({ data }: Props) {
             dataKey="revert_rate"
             stroke="#ef4444"
             strokeWidth={2}
-            name="Revert Rate"
+            name={t.charts.revertRate}
             dot={{ fill: "#ef4444" }}
           />
         </ComposedChart>

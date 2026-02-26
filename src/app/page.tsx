@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { getRepositories } from "@/lib/data";
-import { RepositorySelector, DeleteButton } from "@/components/ui";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import { formatTimestamp } from "@/lib/i18n/format";
+import { RepositorySelector, DeleteButton, LocaleToggle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const repositories = await getRepositories();
+  const locale = await getLocale();
+  const t = await getMessages();
 
   return (
     <main className="min-h-screen p-8">
@@ -14,33 +18,40 @@ export default async function HomePage() {
           <div>
             <h1 className="text-3xl font-bold mb-2">dev-vis</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              GitHub Repository DORA Metrics Visualization
+              {t.home.subtitle}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <LocaleToggle />
             <RepositorySelector />
             {repositories.length >= 2 && (
               <Link
                 href="/compare"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                Compare Repositories
+                {t.home.compareRepositories}
               </Link>
             )}
+            <Link
+              href="/settings"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {t.common.settings}
+            </Link>
           </div>
         </div>
       </header>
 
       <section>
-        <h2 className="text-xl font-semibold mb-4">Repositories</h2>
+        <h2 className="text-xl font-semibold mb-4">{t.home.repositories}</h2>
 
         {repositories.length === 0 ? (
           <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              No repositories found.
+              {t.home.noReposFound}
             </p>
             <p className="text-sm text-gray-400 dark:text-gray-500">
-              Click &quot;+ Add Repository&quot; to collect data from GitHub.
+              {t.home.addRepoHint}
             </p>
           </div>
         ) : (
@@ -54,7 +65,7 @@ export default async function HomePage() {
                   <h3 className="font-semibold mb-1">{repo.displayName}</h3>
                   {repo.lastCollected && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Last collected: {formatTimestamp(repo.lastCollected)}
+                      {t.common.lastCollected}: {formatTimestamp(repo.lastCollected, locale)}
                     </p>
                   )}
                 </Link>
@@ -68,19 +79,4 @@ export default async function HomePage() {
       </section>
     </main>
   );
-}
-
-function formatTimestamp(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return isoString;
-  }
 }
