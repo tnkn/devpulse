@@ -1,5 +1,6 @@
 import { getRepositories, getRepoData } from "@/lib/data";
 import { calculateDORAMetrics, calculateSummary } from "@/lib/metrics";
+import { getMessages } from "@/lib/i18n/server";
 import { ComparisonView } from "./ComparisonView";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const repositories = await getRepositories();
   const selectedRepos = params.repos?.split(",") || [];
+  const t = await getMessages();
 
   // Load metrics for selected repositories
   const repoMetrics = await Promise.all(
@@ -49,9 +51,9 @@ export default async function ComparePage({ searchParams }: PageProps) {
   return (
     <main className="min-h-screen p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Repository Comparison</h1>
+        <h1 className="text-3xl font-bold mb-2">{t.compare.title}</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Compare DORA metrics across multiple repositories
+          {t.compare.subtitle}
         </p>
       </header>
 

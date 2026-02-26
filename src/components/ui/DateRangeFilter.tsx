@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   onFilterChange: (startDate: string | null, endDate: string | null) => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
+  const { t } = useI18n();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
@@ -53,7 +55,7 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600 dark:text-gray-400">From:</label>
+        <label className="text-sm text-gray-600 dark:text-gray-400">{t.dateFilter.from}</label>
         <input
           type="date"
           value={startDate}
@@ -64,7 +66,7 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
         />
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600 dark:text-gray-400">To:</label>
+        <label className="text-sm text-gray-600 dark:text-gray-400">{t.dateFilter.to}</label>
         <input
           type="date"
           value={endDate}
@@ -79,11 +81,11 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
           onClick={handleReset}
           className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
-          Reset
+          {t.dateFilter.reset}
         </button>
       </div>
       <div className="flex items-center gap-2 ml-auto">
-        <span className="text-sm text-gray-500 dark:text-gray-400">Quick:</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">{t.dateFilter.quick}</span>
         <button
           onClick={() => handlePreset(7)}
           className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"

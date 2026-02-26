@@ -1,6 +1,7 @@
 "use client";
 
 import type { DORAMetrics } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   metrics: DORAMetrics;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function ExportButtons({ metrics, repoName }: Props) {
+  const { t } = useI18n();
   const safeRepoName = repoName.replace(/\//g, "_");
 
   const handleExportJSON = () => {
@@ -75,7 +77,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("");
 
     // PR Size
-    lines.push("# PR Size");
+    lines.push("# Change Size");
     lines.push("pr_number,title,additions,deletions,total_lines,merged_at");
     metrics.pr_size.forEach((item) => {
       lines.push(
@@ -85,7 +87,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("");
 
     // Pick-up Time
-    lines.push("# Pick-up Time");
+    lines.push("# Time to First Review");
     lines.push("pr_number,title,pickup_time_hours,created_at,first_review_at");
     metrics.pickup_time.forEach((item) => {
       lines.push(
@@ -99,7 +101,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-500 dark:text-gray-400">Export:</span>
+      <span className="text-sm text-gray-500 dark:text-gray-400">{t.exportButtons.export}</span>
       <button
         onClick={handleExportJSON}
         className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"

@@ -12,16 +12,19 @@ import {
   Legend,
 } from "recharts";
 import type { ChangeFailureRate } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   data: ChangeFailureRate[];
 }
 
 export function ChangeFailureRateChart({ data }: Props) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No deployment data available
+        {t.charts.noDeploymentData}
       </div>
     );
   }
@@ -58,7 +61,7 @@ export function ChangeFailureRateChart({ data }: Props) {
             }}
             labelStyle={{ color: "var(--foreground)" }}
             formatter={(value, name) => {
-              if (name === "Failure Rate") return [`${value}%`, name];
+              if (name === t.charts.failureRate) return [`${value}%`, name];
               return [value, name];
             }}
           />
@@ -67,7 +70,7 @@ export function ChangeFailureRateChart({ data }: Props) {
             yAxisId="left"
             dataKey="failed_deployments"
             fill="#ef4444"
-            name="Failed"
+            name={t.charts.failedLabel}
             radius={[4, 4, 0, 0]}
           />
           <Line
@@ -76,7 +79,7 @@ export function ChangeFailureRateChart({ data }: Props) {
             dataKey="failure_rate"
             stroke="#f97316"
             strokeWidth={2}
-            name="Failure Rate"
+            name={t.charts.failureRate}
             dot={{ fill: "#f97316" }}
           />
         </ComposedChart>

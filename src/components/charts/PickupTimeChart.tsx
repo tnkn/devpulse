@@ -12,16 +12,19 @@ import {
   ComposedChart,
 } from "recharts";
 import type { PeriodStats } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   data: PeriodStats[];
 }
 
 export function PickupTimeChart({ data }: Props) {
+  const { t } = useI18n();
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        No review data available
+        {t.charts.noReviewData}
       </div>
     );
   }
@@ -53,7 +56,7 @@ export function PickupTimeChart({ data }: Props) {
             className="text-xs"
             tick={{ fill: "currentColor" }}
             label={{
-              value: "Hours",
+              value: t.charts.hours,
               angle: -90,
               position: "insideLeft",
               style: { fill: "currentColor" },
@@ -69,8 +72,8 @@ export function PickupTimeChart({ data }: Props) {
             formatter={(value, name) => {
               if (name === "sigma_band") return null;
               if (name === "Avg") return [`${value}h`, name];
-              if (name === "+σ") return [`${value}h`, name];
-              if (name === "-σ") return [`${value}h`, name];
+              if (name === "+\u03C3") return [`${value}h`, name];
+              if (name === "-\u03C3") return [`${value}h`, name];
               return [value, name];
             }}
             itemSorter={() => 0}
@@ -92,7 +95,7 @@ export function PickupTimeChart({ data }: Props) {
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}
-            name="+σ"
+            name="+&#963;"
           />
           <Line
             type="monotone"
@@ -101,7 +104,7 @@ export function PickupTimeChart({ data }: Props) {
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}
-            name="-σ"
+            name="-&#963;"
           />
           <Line
             type="monotone"

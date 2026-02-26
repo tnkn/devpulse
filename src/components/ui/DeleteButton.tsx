@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   repoKey: string;
@@ -10,6 +11,7 @@ interface Props {
 
 export function DeleteButton({ repoKey, repoName }: Props) {
   const router = useRouter();
+  const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -35,7 +37,7 @@ export function DeleteButton({ repoKey, repoName }: Props) {
   if (deleting) {
     return (
       <span className="text-sm text-gray-500 dark:text-gray-400">
-        Deleting...
+        {t.deleteButton.deleting}
       </span>
     );
   }
@@ -44,19 +46,19 @@ export function DeleteButton({ repoKey, repoName }: Props) {
     return (
       <div className="inline-flex items-center gap-2">
         <span className="text-sm text-red-600 dark:text-red-400">
-          Delete {repoName}?
+          {t.deleteButton.deleteConfirm(repoName)}
         </span>
         <button
           onClick={handleDelete}
           className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
         >
-          Confirm
+          {t.deleteButton.confirm}
         </button>
         <button
           onClick={() => setConfirming(false)}
           className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
-          Cancel
+          {t.deleteButton.cancel}
         </button>
       </div>
     );
@@ -67,7 +69,7 @@ export function DeleteButton({ repoKey, repoName }: Props) {
       onClick={() => setConfirming(true)}
       className="px-4 py-2 text-sm text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
     >
-      Delete
+      {t.deleteButton.delete}
     </button>
   );
 }
