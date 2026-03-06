@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { DeploymentFrequency } from "@/types";
 import { useI18n } from "@/lib/i18n";
+import { formatPeriod } from "@/lib/i18n/format";
 
 interface Props {
   data: DeploymentFrequency[];
@@ -36,6 +37,7 @@ export function DeploymentFrequencyChart({ data }: Props) {
             dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
+            tickFormatter={(v) => formatPeriod(v, "compact")}
           />
           <YAxis
             className="text-xs"
@@ -49,6 +51,7 @@ export function DeploymentFrequencyChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
+            labelFormatter={(label) => formatPeriod(label as string)}
           />
           <Bar
             dataKey="count"
