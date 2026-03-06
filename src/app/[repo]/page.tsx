@@ -119,8 +119,10 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
         </div>
       </section>
 
+      <hr className="border-gray-200 dark:border-gray-700 mb-8" />
+
       {/* Interactive Dashboard */}
-      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} pulls={data.pulls} reviews={data.reviews} />
+      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} repoFullName={data.metadata.repository} pulls={data.pulls} reviews={data.reviews} commits={data.commits} />
     </main>
   );
 }

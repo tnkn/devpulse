@@ -133,6 +133,22 @@ export type Messages = {
     reviewCount: string;
     noPRAuthorData: string;
     noReviewerData: string;
+    activityHistory: (login: string) => string;
+    createdPRs: string;
+    createdDate: string;
+    mergedDate: string;
+    timeToMerge: string;
+    commitHistory: string;
+    commitDate: string;
+    commitMessage: string;
+    relatedPR: string;
+    noCommitData: string;
+    reviewHistory: string;
+    reviewDate: string;
+    reviewState: string;
+    reviewedPR: string;
+    noReviewActivityData: string;
+    close: string;
   };
   repoSelector: {
     addRepository: string;
@@ -320,6 +336,22 @@ const en: Messages = {
     reviewCount: "Review Count",
     noPRAuthorData: "No PR author data available.",
     noReviewerData: "No reviewer data available.",
+    activityHistory: (login) => `${login} Activity History`,
+    createdPRs: "Created PRs",
+    createdDate: "Created Date",
+    mergedDate: "Merged Date",
+    timeToMerge: "Time to Merge (h)",
+    commitHistory: "Commits",
+    commitDate: "Commit Date",
+    commitMessage: "Commit Message",
+    relatedPR: "Related PR",
+    noCommitData: "No commit data available for this user.",
+    reviewHistory: "Reviews",
+    reviewDate: "Review Date",
+    reviewState: "State",
+    reviewedPR: "Reviewed PR",
+    noReviewActivityData: "No review activity data available for this user.",
+    close: "Close",
   },
   repoSelector: {
     addRepository: "+ Add Repository",
@@ -517,8 +549,24 @@ const ja: Messages = {
     avgPRsPerBusinessDay: "\u55B6\u696D\u65E5\u3042\u305F\u308A\u5E73\u5747 PR",
     reviewedPRsUnique: "\u30EC\u30D3\u30E5\u30FC PR \u6570\uFF08\u30E6\u30CB\u30FC\u30AF\uFF09",
     reviewCount: "\u30EC\u30D3\u30E5\u30FC\u56DE\u6570",
-    noPRAuthorData: "PR \u4F5C\u6210\u8005\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
-    noReviewerData: "\u30EC\u30D3\u30E5\u30A2\u30FC\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
+    noPRAuthorData: "PR 作成者データがありません。",
+    noReviewerData: "レビュアーデータがありません。",
+    activityHistory: (login) => `${login} のアクティビティ履歴`,
+    createdPRs: "作成した PR",
+    createdDate: "作成日",
+    mergedDate: "マージ日",
+    timeToMerge: "マージまでの時間 (h)",
+    commitHistory: "コミット",
+    commitDate: "コミット日",
+    commitMessage: "コミットメッセージ",
+    relatedPR: "関連 PR",
+    noCommitData: "このユーザーのコミットデータがありません。",
+    reviewHistory: "レビュー",
+    reviewDate: "レビュー日",
+    reviewState: "ステート",
+    reviewedPR: "レビュー対象 PR",
+    noReviewActivityData: "このユーザーのレビューデータがありません。",
+    close: "閉じる",
   },
   repoSelector: {
     addRepository: "+ \u30EA\u30DD\u30B8\u30C8\u30EA\u3092\u8FFD\u52A0",

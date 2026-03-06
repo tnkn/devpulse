@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { DORAMetrics, PeriodGranularity, PeriodMetrics, DeploymentFrequency, RevertRate, LeadTimePeriodStats, PeriodStats, PullRequest, Review } from "@/types";
+import type { DORAMetrics, PeriodGranularity, PeriodMetrics, DeploymentFrequency, RevertRate, LeadTimePeriodStats, PeriodStats, PullRequest, Review, Commit } from "@/types";
 import {
   DeploymentFrequencyChart,
   LeadTimeChart,
@@ -12,13 +12,16 @@ import {
 } from "@/components/charts";
 import { DateRangeFilter, ExportButtons } from "@/components/ui";
 import { useI18n } from "@/lib/i18n";
+import { formatPeriod } from "@/lib/i18n/format";
 
 interface Props {
   metrics: DORAMetrics;
   allPeriodMetrics: Record<PeriodGranularity, PeriodMetrics>;
   repoName: string;
+  repoFullName: string;
   pulls: PullRequest[];
   reviews: Review[];
+  commits: Commit[];
 }
 
 function periodToDate(period: string): Date {
@@ -60,12 +63,13 @@ function countBusinessDays(start: Date, end: Date): number {
   return Math.max(count, 1);
 }
 
-export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, reviews }: Props) {
+export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFullName, pulls, reviews, commits }: Props) {
   const { t } = useI18n();
   const [dateRange, setDateRange] = useState<{
     start: string | null;
     end: string | null;
   }>({ start: null, end: null });
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
   const [granularity, setGranularity] = useState<PeriodGranularity>("week");
 
@@ -223,6 +227,26 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
       .sort((a, b) => b.totalCount - a.totalCount);
   }, [reviews, dateRange]);
 
+  // Build login → Set<email> mapping via merge_commit_sha
+  const loginToEmails = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const commitBysha = new Map<string, Commit>();
+    for (const c of commits) {
+      commitBysha.set(c.sha, c);
+    }
+    for (const pr of pulls) {
+      if (pr.user_login && pr.merge_commit_sha) {
+        const commit = commitBysha.get(pr.merge_commit_sha);
+        if (commit) {
+          const emails = map.get(pr.user_login) ?? new Set<string>();
+          emails.add(commit.author.email);
+          map.set(pr.user_login, emails);
+        }
+      }
+    }
+    return map;
+  }, [pulls, commits]);
+
   const handleFilterChange = (start: string | null, end: string | null) => {
     setDateRange({ start, end });
   };
@@ -230,7 +254,7 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
   return (
     <div>
       {/* Filter & Export */}
-      <section className="mb-6">
+      <section className="sticky top-0 z-10 -mx-8 px-8 py-4 mb-6 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-4">
             <DateRangeFilter onFilterChange={handleFilterChange} />
@@ -294,6 +318,8 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
         </div>
       </section>
 
+      <hr className="border-gray-200 dark:border-gray-700 mb-8" />
+
       {/* Detailed Tables */}
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">{t.metrics.detailedData}</h2>
@@ -335,7 +361,7 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
                       key={item.period}
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
-                      <td className="py-2 px-4">{item.period}</td>
+                      <td className="py-2 px-4">{formatPeriod(item.period)}</td>
                       <td className="text-right py-2 px-4">{item.total_deployments}</td>
                       <td className="text-right py-2 px-4">{item.failed_deployments}</td>
                       <td className="text-right py-2 px-4">{item.failure_rate}%</td>
@@ -448,6 +474,8 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
         </div>
       </section>
 
+      <hr className="border-gray-200 dark:border-gray-700 mb-8" />
+
       {/* Per-Person Metrics */}
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">{t.metrics.perPersonPRMetrics}</h2>
@@ -468,7 +496,9 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
               <tbody>
                 {perPersonPR.map((row) => (
                   <tr key={row.login} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-2 px-4">{row.login}</td>
+                    <td className="py-2 px-4">
+                      <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={() => setSelectedUser(row.login)}>{row.login}</button>
+                    </td>
                     <td className="text-right py-2 px-4">{row.count}</td>
                     <td className="text-right py-2 px-4">{row.avgPerDay}</td>
                     <td className="text-right py-2 px-4 text-green-600">+{row.additions}</td>
@@ -496,7 +526,9 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
               <tbody>
                 {perPersonReview.map((row) => (
                   <tr key={row.login} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-2 px-4">{row.login}</td>
+                    <td className="py-2 px-4">
+                      <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={() => setSelectedUser(row.login)}>{row.login}</button>
+                    </td>
                     <td className="text-right py-2 px-4">{row.uniquePRs}</td>
                     <td className="text-right py-2 px-4">{row.totalCount}</td>
                   </tr>
@@ -506,6 +538,286 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, pulls, r
           </div>
         )}
       </section>
+
+      {selectedUser && (
+        <PersonActivityModal
+          login={selectedUser}
+          repoFullName={repoFullName}
+          pulls={pulls}
+          commits={commits}
+          reviews={reviews}
+          loginToEmails={loginToEmails}
+          dateRange={dateRange}
+          onClose={() => setSelectedUser(null)}
+          t={t}
+        />
+      )}
+    </div>
+  );
+}
+
+function PersonActivityModal({
+  login,
+  repoFullName,
+  pulls,
+  commits,
+  reviews,
+  loginToEmails,
+  dateRange,
+  onClose,
+  t,
+}: {
+  login: string;
+  repoFullName: string;
+  pulls: PullRequest[];
+  commits: Commit[];
+  reviews: Review[];
+  loginToEmails: Map<string, Set<string>>;
+  dateRange: { start: string | null; end: string | null };
+  onClose: () => void;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  const [activeTab, setActiveTab] = useState<"prs" | "commits" | "reviews">("prs");
+  const startDate = dateRange.start ? new Date(dateRange.start) : null;
+  const endDate = dateRange.end ? new Date(dateRange.end) : null;
+
+  // User's merged PRs in date range
+  const userPRs = useMemo(() => {
+    return pulls
+      .filter((pr) => {
+        if (pr.user_login !== login || !pr.merged_at) return false;
+        const d = new Date(pr.merged_at);
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [pulls, login, startDate, endDate]);
+
+  // Build sha → PR lookup for related PR column
+  const shaTopr = useMemo(() => {
+    const map = new Map<string, PullRequest>();
+    for (const pr of pulls) {
+      if (pr.merge_commit_sha) {
+        map.set(pr.merge_commit_sha, pr);
+      }
+    }
+    return map;
+  }, [pulls]);
+
+  // User's commits in date range (matched via email mapping)
+  const userCommits = useMemo(() => {
+    const emails = loginToEmails.get(login);
+    if (!emails || emails.size === 0) return [];
+    return commits
+      .filter((c) => {
+        if (!emails.has(c.author.email)) return false;
+        const d = new Date(c.author.date);
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.author.date).getTime() - new Date(a.author.date).getTime());
+  }, [commits, login, loginToEmails, startDate, endDate]);
+
+  // User's reviews in date range
+  const userReviews = useMemo(() => {
+    return reviews
+      .filter((r) => {
+        if (r.user_login !== login || r.user_type === "Bot") return false;
+        const d = new Date(r.submitted_at);
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+  }, [reviews, login, startDate, endDate]);
+
+  // PR number → PR lookup for review tab
+  const prByNumber = useMemo(() => {
+    const map = new Map<number, PullRequest>();
+    for (const pr of pulls) {
+      map.set(pr.number, pr);
+    }
+    return map;
+  }, [pulls]);
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
+          <h2 className="text-lg font-semibold">{t.metrics.activityHistory(login)}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none px-2">&times;</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700 px-4">
+          <button
+            onClick={() => setActiveTab("prs")}
+            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "prs"
+                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            {t.metrics.createdPRs} ({userPRs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("commits")}
+            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "commits"
+                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            {t.metrics.commitHistory} ({userCommits.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("reviews")}
+            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "reviews"
+                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            {t.metrics.reviewHistory} ({userReviews.length})
+          </button>
+        </div>
+
+        <div className="p-4">
+          {/* Created PRs Tab */}
+          {activeTab === "prs" && (
+            userPRs.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noMergedPRData}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 px-3">{t.metrics.createdDate}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.pr}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.mergedDate}</th>
+                      <th className="text-right py-2 px-3">{t.metrics.timeToMerge}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userPRs.map((pr) => {
+                      const leadHours = pr.merged_at
+                        ? Math.round((new Date(pr.merged_at).getTime() - new Date(pr.created_at).getTime()) / 3600000 * 10) / 10
+                        : null;
+                      return (
+                        <tr key={pr.number} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(pr.created_at)}</td>
+                          <td className="py-2 px-3">
+                            <a href={`https://github.com/${repoFullName}/pull/${pr.number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                              #{pr.number}
+                            </a>{" "}
+                            <span className="max-w-xs truncate inline-block align-bottom">{pr.title}</span>
+                          </td>
+                          <td className="py-2 px-3 whitespace-nowrap">{pr.merged_at ? formatDate(pr.merged_at) : "-"}</td>
+                          <td className="text-right py-2 px-3">{leadHours ?? "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {/* Commits Tab */}
+          {activeTab === "commits" && (
+            userCommits.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noCommitData}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 px-3">{t.metrics.commitDate}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.commitMessage}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.relatedPR}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userCommits.slice(0, 100).map((c) => {
+                      const relatedPR = shaTopr.get(c.sha);
+                      return (
+                        <tr key={c.sha} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(c.author.date)}</td>
+                          <td className="py-2 px-3 max-w-md truncate">
+                            <a href={`https://github.com/${repoFullName}/commit/${c.sha}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {c.message.split("\n")[0]}
+                            </a>
+                          </td>
+                          <td className="py-2 px-3">
+                            {relatedPR ? (
+                              <a href={`https://github.com/${repoFullName}/pull/${relatedPR.number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                #{relatedPR.number} {relatedPR.title}
+                              </a>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {/* Reviews Tab */}
+          {activeTab === "reviews" && (
+            userReviews.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noReviewActivityData}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 px-3">{t.metrics.reviewDate}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.reviewedPR}</th>
+                      <th className="text-left py-2 px-3">{t.metrics.reviewState}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userReviews.slice(0, 100).map((r) => {
+                      const pr = prByNumber.get(r.pr_number);
+                      return (
+                        <tr key={r.id} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(r.submitted_at)}</td>
+                          <td className="py-2 px-3">
+                            <a href={`https://github.com/${repoFullName}/pull/${r.pr_number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                              #{r.pr_number}
+                            </a>{" "}
+                            {pr && <span className="max-w-xs truncate inline-block align-bottom">{pr.title}</span>}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                              r.state === "APPROVED" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
+                              r.state === "CHANGES_REQUESTED" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" :
+                              "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                            }`}>
+                              {r.state}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -557,7 +869,7 @@ function PeriodSummaryTable({
                 key={period}
                 className="border-b border-gray-100 dark:border-gray-800"
               >
-                <td className="py-2 px-3">{period}</td>
+                <td className="py-2 px-3">{formatPeriod(period)}</td>
                 <td className="text-right py-2 px-3">{df?.count ?? "-"}</td>
                 <td className="text-right py-2 px-3">{rr?.revert_commits ?? "-"}</td>
                 <td className="text-right py-2 px-3">
