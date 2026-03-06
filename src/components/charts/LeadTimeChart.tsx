@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { LeadTimePeriodStats } from "@/types";
 import { useI18n } from "@/lib/i18n";
+import { formatPeriod } from "@/lib/i18n/format";
 
 interface Props {
   data: LeadTimePeriodStats[];
@@ -52,6 +53,7 @@ export function LeadTimeChart({ data }: Props) {
             dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
+            tickFormatter={(v) => formatPeriod(v, "compact")}
           />
           <YAxis
             className="text-xs"
@@ -70,6 +72,7 @@ export function LeadTimeChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
+            labelFormatter={(label) => formatPeriod(label as string)}
             formatter={(value, name) => {
               if (name === "sigma_band") return null;
               if (name === "Avg") return [`${value}h`, name];

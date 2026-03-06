@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { ChangeFailureRate } from "@/types";
 import { useI18n } from "@/lib/i18n";
+import { formatPeriod } from "@/lib/i18n/format";
 
 interface Props {
   data: ChangeFailureRate[];
@@ -38,6 +39,7 @@ export function ChangeFailureRateChart({ data }: Props) {
             dataKey="period"
             className="text-xs"
             tick={{ fill: "currentColor" }}
+            tickFormatter={(v) => formatPeriod(v, "compact")}
           />
           <YAxis
             yAxisId="left"
@@ -60,6 +62,7 @@ export function ChangeFailureRateChart({ data }: Props) {
               borderRadius: "4px",
             }}
             labelStyle={{ color: "var(--foreground)" }}
+            labelFormatter={(label) => formatPeriod(label as string)}
             formatter={(value, name) => {
               if (name === t.charts.failureRate) return [`${value}%`, name];
               return [value, name];
