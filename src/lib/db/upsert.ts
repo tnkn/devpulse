@@ -24,8 +24,8 @@ export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): 
 export async function upsertPullRequests(conn: DuckDBConnection, prs: PullRequest[]): Promise<void> {
   if (prs.length === 0) return;
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
+    `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login, assignees_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`
   );
   for (const pr of prs) {
     stmt.bindInteger(1, pr.number);
@@ -45,6 +45,7 @@ export async function upsertPullRequests(conn: DuckDBConnection, prs: PullReques
     if (pr.additions !== undefined) stmt.bindInteger(15, pr.additions); else stmt.bindNull(15);
     if (pr.deletions !== undefined) stmt.bindInteger(16, pr.deletions); else stmt.bindNull(16);
     if (pr.user_login) stmt.bindVarchar(17, pr.user_login); else stmt.bindNull(17);
+    stmt.bindVarchar(18, JSON.stringify(pr.assignees ?? []));
     await stmt.run();
   }
   stmt.destroySync();

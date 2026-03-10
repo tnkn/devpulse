@@ -152,7 +152,8 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
     const endDate = dateRange.end ? new Date(dateRange.end) : null;
 
     const merged = pulls.filter((pr) => {
-      if (!pr.merged_at || !pr.user_login) return false;
+      if (!pr.merged_at) return false;
+      if (!pr.assignees?.length && !pr.user_login) return false;
       const d = new Date(pr.merged_at);
       if (startDate && d < startDate) return false;
       if (endDate && d > endDate) return false;
@@ -176,12 +177,15 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
     const byUser = new Map<string, { count: number; additions: number; deletions: number }>();
     for (const pr of merged) {
-      const login = pr.user_login!;
-      const cur = byUser.get(login) ?? { count: 0, additions: 0, deletions: 0 };
-      cur.count++;
-      cur.additions += pr.additions ?? 0;
-      cur.deletions += pr.deletions ?? 0;
-      byUser.set(login, cur);
+      // Use assignees if available, otherwise fall back to user_login
+      const logins = pr.assignees?.length ? pr.assignees : pr.user_login ? [pr.user_login] : [];
+      for (const login of logins) {
+        const cur = byUser.get(login) ?? { count: 0, additions: 0, deletions: 0 };
+        cur.count++;
+        cur.additions += pr.additions ?? 0;
+        cur.deletions += pr.deletions ?? 0;
+        byUser.set(login, cur);
+      }
     }
 
     return [...byUser.entries()]
@@ -581,11 +585,13 @@ function PersonActivityModal({
   const startDate = dateRange.start ? new Date(dateRange.start) : null;
   const endDate = dateRange.end ? new Date(dateRange.end) : null;
 
-  // User's merged PRs in date range
+  // User's merged PRs in date range (by assignees, fallback to user_login)
   const userPRs = useMemo(() => {
     return pulls
       .filter((pr) => {
-        if (pr.user_login !== login || !pr.merged_at) return false;
+        if (!pr.merged_at) return false;
+        const assigned = pr.assignees?.length ? pr.assignees.includes(login) : pr.user_login === login;
+        if (!assigned) return false;
         const d = new Date(pr.merged_at);
         if (startDate && d < startDate) return false;
         if (endDate && d > endDate) return false;
@@ -665,7 +671,7 @@ function PersonActivityModal({
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            {t.metrics.createdPRs} ({userPRs.length})
+            {t.metrics.mergedPRsTab} ({userPRs.length})
           </button>
           <button
             onClick={() => setActiveTab("commits")}
