@@ -6,10 +6,50 @@ GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev
 
 | メトリクス | 説明 | データソース |
 |---|---|---|
-| **Deployment Frequency** | デプロイ頻度（月別） | マージ済み PR 数 |
+| **Deployment Frequency** | デプロイ頻度（日・週・月別） | マージ済み PR 数 |
 | **Lead Time for Changes** | 変更のリードタイム | PR 作成〜マージまでの時間 |
 | **Change Failure Rate** | 変更失敗率 | マージ時の CI 失敗率 |
-| **Time to Restore (MTTR)** | 復旧時間 | Issue のオープン〜クローズまでの時間 |
+| **Revert Rate** | リバート率 | リバートコミットの割合 |
+| **Change Size** | 変更サイズ | PR あたりの変更行数（LOC） |
+| **Time to First Review** | 初回レビュー時間 | PR 作成〜最初のレビューまでの時間 |
+
+## 主な機能
+
+- **DORA メトリクスダッシュボード** — 6 種類のチャートと詳細テーブル
+- **期間粒度の切り替え** — 日・週・月でチャートを切り替え
+- **日付フィルター** — 任意の期間に絞り込み
+- **個人別メトリクス** — マージ PR 数（Assignee ベース）・レビュー数を個人別に集計
+- **アクティビティ履歴モーダル** — ユーザー名クリックで PR・コミット・レビューの詳細をタブ表示（GitHub リンク付き）
+- **多言語対応** — 英語 / 日本語の切り替え
+- **複数リポジトリの比較**
+- **データエクスポート** — JSON / CSV
+- **GitHub トークン管理** — Settings ページから複数トークンの登録・テスト・切り替え
+
+## 計算ロジック
+
+### チームメトリクス（チャート・期間サマリー）
+
+| メトリクス | 計算方法 |
+|---|---|
+| Deployment Frequency | 期間内のマージ済み PR 数を日・週・月で集計 |
+| Lead Time for Changes | PR の `created_at` 〜 `merged_at` の差分（時間） |
+| Change Failure Rate | マージ時に CI が失敗した PR の割合 |
+| Revert Rate | 期間内コミットのうち "revert" コミットの割合 |
+| Change Size | PR あたりの `additions + deletions`（LOC）の平均・σ |
+| Time to First Review | PR の `created_at` 〜 最初のレビュー `submitted_at` の差分（時間） |
+
+### 個人別メトリクス
+
+- **PR メトリクス**: マージ済み PR の **Assignees** を基に個人に帰属させる。Assignees が未設定の場合は PR 作成者（`user_login`）にフォールバック。1 つの PR に複数 Assignees がいる場合、各担当者にそれぞれカウントされる。
+- **レビューメトリクス**: レビューの `user_login` を基に集計。Bot は除外。
+
+### アクティビティ履歴（モーダル）
+
+ユーザー名クリックで表示されるモーダルには 3 つのタブがある:
+
+- **Merged PRs** — 当該ユーザーが Assignee（またはフォールバックで作成者）のマージ済み PR
+- **Commits** — マージコミットの `author.email` から `login → email` のマッピングを構築し、コミットを個人に紐付け
+- **Reviews** — 当該ユーザーのレビュー履歴
 
 ## セットアップ
 
@@ -32,12 +72,13 @@ cp .env.sample .env
 | 変数名 | 説明 | デフォルト値 |
 |---|---|---|
 | `DATA_DIR` | データディレクトリパス | `./data` |
-| `PORT` | アプリケーションポート | `3000` |
-| `GITHUB_TOKEN` | GitHub Personal Access Token | (必須) |
+| `GITHUB_TOKEN` | GitHub Personal Access Token | — |
+| `ALLOW_TOKEN_UI` | UI からのトークン管理を許可 | `true` |
+| `ENCRYPTION_KEY` | DB 内トークンの暗号化キー | (自動生成) |
 
 ### GitHub Personal Access Token の設定
 
-リポジトリの検索・データ収集に GitHub PAT が必要です。
+リポジトリの検索・データ収集に GitHub PAT が必要です。環境変数 `GITHUB_TOKEN` に設定するか、Settings ページから UI で登録できます。
 
 #### Fine-grained PAT（推奨）
 
@@ -96,13 +137,6 @@ data/
 #### 差分取得
 
 2回目以降のデータ収集では、DB 内の最新タイムスタンプを基に差分のみを GitHub API から取得します。これにより API コール数を大幅に削減できます。
-
-### 主な機能
-
-- リポジトリごとの DORA メトリクスダッシュボード
-- 期間フィルター
-- 複数リポジトリの比較
-- データエクスポート（JSON / CSV）
 
 ## 技術スタック
 
