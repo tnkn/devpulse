@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS pull_requests (
   ci_failed BOOLEAN,
   additions INTEGER,
   deletions INTEGER,
-  user_login TEXT
+  user_login TEXT,
+  assignees_json TEXT DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS releases (
@@ -75,6 +76,7 @@ export const MIGRATION_DDL = `
 ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS additions INTEGER;
 ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS deletions INTEGER;
 ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS user_login TEXT;
+ALTER TABLE pull_requests ADD COLUMN IF NOT EXISTS assignees_json TEXT DEFAULT '[]';
 ALTER TABLE metadata ADD COLUMN IF NOT EXISTS token_id TEXT;
 
 CREATE TABLE IF NOT EXISTS reviews (

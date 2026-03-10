@@ -134,7 +134,7 @@ export type Messages = {
     noPRAuthorData: string;
     noReviewerData: string;
     activityHistory: (login: string) => string;
-    createdPRs: string;
+    mergedPRsTab: string;
     createdDate: string;
     mergedDate: string;
     timeToMerge: string;
@@ -337,7 +337,7 @@ const en: Messages = {
     noPRAuthorData: "No PR author data available.",
     noReviewerData: "No reviewer data available.",
     activityHistory: (login) => `${login} Activity History`,
-    createdPRs: "Created PRs",
+    mergedPRsTab: "Merged PRs",
     createdDate: "Created Date",
     mergedDate: "Merged Date",
     timeToMerge: "Time to Merge (h)",
@@ -552,7 +552,7 @@ const ja: Messages = {
     noPRAuthorData: "PR 作成者データがありません。",
     noReviewerData: "レビュアーデータがありません。",
     activityHistory: (login) => `${login} のアクティビティ履歴`,
-    createdPRs: "作成した PR",
+    mergedPRsTab: "マージ PR",
     createdDate: "作成日",
     mergedDate: "マージ日",
     timeToMerge: "マージまでの時間 (h)",

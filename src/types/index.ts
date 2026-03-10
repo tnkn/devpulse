@@ -37,6 +37,7 @@ export interface PullRequest {
   additions?: number;
   deletions?: number;
   user_login?: string;
+  assignees?: string[];
 }
 
 export interface Release {

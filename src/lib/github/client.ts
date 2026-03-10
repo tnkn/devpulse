@@ -275,6 +275,7 @@ function mapPullRequest(pr: Record<string, unknown>): PullRequest {
   const base = pr.base as Record<string, unknown>;
   const labels = pr.labels as Array<Record<string, unknown>>;
   const user = pr.user as Record<string, unknown> | null;
+  const assigneesRaw = (pr.assignees as Array<Record<string, unknown>> | null) ?? [];
   return {
     number: pr.number as number,
     title: pr.title as string,
@@ -294,6 +295,7 @@ function mapPullRequest(pr: Record<string, unknown>): PullRequest {
     },
     labels: labels.map((l) => ({ name: l.name as string })),
     ...(user?.login ? { user_login: user.login as string } : {}),
+    assignees: assigneesRaw.map((a) => a.login as string).filter(Boolean),
   };
 }
 
