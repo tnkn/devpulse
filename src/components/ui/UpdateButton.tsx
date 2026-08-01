@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { CollectionJob, GitHubTokenMasked } from "@/types";
+import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import type { CollectionJob, GitHubTokenMasked } from "@/types";
 
 interface Props {
   owner: string;
@@ -16,10 +16,13 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
   const { t } = useI18n();
   const [job, setJob] = useState<CollectionJob | null>(null);
   const [tokens, setTokens] = useState<GitHubTokenMasked[]>([]);
-  const [selectedTokenId, setSelectedTokenId] = useState<string>(tokenId || "env");
+  const [selectedTokenId, setSelectedTokenId] = useState<string>(
+    tokenId || "env",
+  );
   const [hasEnvToken, setHasEnvToken] = useState(false);
 
-  const isRunning = job && (job.status === "pending" || job.status === "collecting");
+  const isRunning =
+    job && (job.status === "pending" || job.status === "collecting");
 
   // Fetch available tokens
   useEffect(() => {
@@ -91,8 +94,21 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
     return (
       <div className="inline-flex items-center gap-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded">
         <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <title>Loading</title>
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="none"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
         </svg>
         <span>{job?.progress}</span>
       </div>
@@ -102,10 +118,14 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
   if (job?.status === "failed") {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="text-sm text-red-600 dark:text-red-400" title={job.error || undefined}>
+        <span
+          className="text-sm text-red-600 dark:text-red-400"
+          title={job.error || undefined}
+        >
           {t.updateButton.updateFailed}
         </span>
         <button
+          type="button"
           onClick={startUpdate}
           className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
@@ -131,6 +151,7 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
         </select>
       )}
       <button
+        type="button"
         onClick={startUpdate}
         className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
       >

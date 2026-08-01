@@ -1,9 +1,9 @@
-import { DuckDBInstance } from "@duckdb/node-api";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type { DuckDBConnection } from "@duckdb/node-api";
-import { promises as fs } from "fs";
-import path from "path";
-import { SCHEMA_DDL, MIGRATION_DDL } from "./schema";
+import { DuckDBInstance } from "@duckdb/node-api";
 import { migrateJsonToDb } from "./migrate-json";
+import { MIGRATION_DDL, SCHEMA_DDL } from "./schema";
 
 const DATA_DIR = process.env.DATA_DIR || "./data";
 
@@ -48,7 +48,7 @@ function dbPath(repoKey: string): string {
 }
 
 function walPath(repoKey: string): string {
-  return dbPath(repoKey) + ".wal";
+  return `${dbPath(repoKey)}.wal`;
 }
 
 async function initSchema(conn: DuckDBConnection): Promise<void> {
@@ -80,12 +80,14 @@ async function runMigrations(conn: DuckDBConnection): Promise<void> {
  *   1. Delete .wal file → retry (loses uncommitted data since last checkpoint)
  *   2. Delete .duckdb + .wal → re-create & re-migrate from JSON (full rebuild)
  */
-async function openInstance(repoKey: string): Promise<{ instance: DuckDBInstance; isNew: boolean }> {
+async function openInstance(
+  repoKey: string,
+): Promise<{ instance: DuckDBInstance; isNew: boolean }> {
   const filePath = dbPath(repoKey);
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
 
-  const isNew = !await fileExists(filePath);
+  const isNew = !(await fileExists(filePath));
 
   // First attempt: normal open (includes WAL replay)
   try {
@@ -103,15 +105,22 @@ async function openInstance(repoKey: string): Promise<{ instance: DuckDBInstance
     await fs.unlink(wal);
     try {
       const instance = await DuckDBInstance.create(filePath);
-      console.warn(`[db] Recovered ${repoKey} after WAL deletion (data since last checkpoint may be lost)`);
+      console.warn(
+        `[db] Recovered ${repoKey} after WAL deletion (data since last checkpoint may be lost)`,
+      );
       return { instance, isNew: false };
     } catch (err2) {
-      console.error(`[db] Still failed after WAL deletion for ${repoKey}:`, err2);
+      console.error(
+        `[db] Still failed after WAL deletion for ${repoKey}:`,
+        err2,
+      );
     }
   }
 
   // Third attempt: delete everything, rebuild from JSON
-  console.warn(`[db] Deleting corrupt DB for ${repoKey} and rebuilding from JSON...`);
+  console.warn(
+    `[db] Deleting corrupt DB for ${repoKey} and rebuilding from JSON...`,
+  );
   await fs.unlink(filePath).catch(() => {});
   await fs.unlink(wal).catch(() => {});
   const instance = await DuckDBInstance.create(filePath);
@@ -163,7 +172,9 @@ export async function getDb(repoKey: string): Promise<DuckDBInstance> {
   return instance;
 }
 
-export async function getConnection(repoKey: string): Promise<DuckDBConnection> {
+export async function getConnection(
+  repoKey: string,
+): Promise<DuckDBConnection> {
   const instance = await getDb(repoKey);
   return instance.connect();
 }
@@ -211,8 +222,11 @@ export async function getRepositoryKeys(): Promise<string[]> {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       // Check if repo.duckdb exists OR if there are JSON dumps (will be auto-migrated)
-      const hasDb = await fileExists(path.join(dataPath, entry.name, "repo.duckdb"));
-      const hasJsonDumps = !hasDb && await hasJsonData(path.join(dataPath, entry.name));
+      const hasDb = await fileExists(
+        path.join(dataPath, entry.name, "repo.duckdb"),
+      );
+      const hasJsonDumps =
+        !hasDb && (await hasJsonData(path.join(dataPath, entry.name)));
       if (hasDb || hasJsonDumps) {
         keys.push(entry.name);
       }

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getRepoData } from "@/lib/data";
-import { calculateDORAMetrics, calculateAllPeriodMetrics, calculateSummary } from "@/lib/metrics";
 import { MetricsDashboard } from "@/components/MetricsDashboard";
-import { UpdateButton, DeleteButton, LocaleToggle } from "@/components/ui";
-import { getLocale, getMessages } from "@/lib/i18n/server";
+import { DeleteButton, LocaleToggle, UpdateButton } from "@/components/ui";
+import { getRepoData } from "@/lib/data";
 import { formatTimestamp } from "@/lib/i18n/format";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import {
+  calculateAllPeriodMetrics,
+  calculateDORAMetrics,
+  calculateSummary,
+} from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +29,12 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
     notFound();
   }
 
-  const metrics = calculateDORAMetrics(
+  const metrics = calculateDORAMetrics(data.pulls, data.commits, data.reviews);
+  const allPeriodMetrics = calculateAllPeriodMetrics(
     data.pulls,
     data.commits,
-    data.reviews
+    data.reviews,
   );
-  const allPeriodMetrics = calculateAllPeriodMetrics(data.pulls, data.commits, data.reviews);
   const summary = calculateSummary(metrics);
   const locale = await getLocale();
   const t = await getMessages();
@@ -61,7 +65,8 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
           </div>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          {t.common.lastCollected}: {formatTimestamp(data.metadata.dumped_at, locale)}
+          {t.common.lastCollected}:{" "}
+          {formatTimestamp(data.metadata.dumped_at, locale)}
         </p>
       </header>
 
@@ -122,7 +127,15 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
       <hr className="border-gray-200 dark:border-gray-700 mb-8" />
 
       {/* Interactive Dashboard */}
-      <MetricsDashboard metrics={metrics} allPeriodMetrics={allPeriodMetrics} repoName={decodedRepo} repoFullName={data.metadata.repository} pulls={data.pulls} reviews={data.reviews} commits={data.commits} />
+      <MetricsDashboard
+        metrics={metrics}
+        allPeriodMetrics={allPeriodMetrics}
+        repoName={decodedRepo}
+        repoFullName={data.metadata.repository}
+        pulls={data.pulls}
+        reviews={data.reviews}
+        commits={data.commits}
+      />
     </main>
   );
 }
@@ -143,7 +156,9 @@ function SummaryCard({
       <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</h3>
       <p className="text-2xl font-bold">
         {value}
-        {unit && <span className="text-sm font-normal text-gray-500 ml-1">{unit}</span>}
+        {unit && (
+          <span className="text-sm font-normal text-gray-500 ml-1">{unit}</span>
+        )}
       </p>
       <p className="text-xs text-gray-400 mt-1">{description}</p>
     </div>

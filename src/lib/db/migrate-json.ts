@@ -1,8 +1,20 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { Commit, PullRequest, Release, Issue, DumpMetadata } from "@/types";
-import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata } from "./upsert";
+import type {
+  Commit,
+  DumpMetadata,
+  Issue,
+  PullRequest,
+  Release,
+} from "@/types";
+import {
+  upsertCommits,
+  upsertIssues,
+  upsertMetadata,
+  upsertPullRequests,
+  upsertReleases,
+} from "./upsert";
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
   try {
@@ -23,9 +35,7 @@ async function findLatestDump(repoDir: string): Promise<string | null> {
       try {
         await fs.access(path.join(candidate, "metadata.json"));
         return candidate;
-      } catch {
-        continue;
-      }
+      } catch {}
     }
     return null;
   } catch {
@@ -33,7 +43,10 @@ async function findLatestDump(repoDir: string): Promise<string | null> {
   }
 }
 
-export async function migrateJsonToDb(conn: DuckDBConnection, repoDir: string): Promise<boolean> {
+export async function migrateJsonToDb(
+  conn: DuckDBConnection,
+  repoDir: string,
+): Promise<boolean> {
   const dumpPath = await findLatestDump(repoDir);
   if (!dumpPath) return false;
 
@@ -56,6 +69,8 @@ export async function migrateJsonToDb(conn: DuckDBConnection, repoDir: string): 
     await upsertMetadata(conn, metadata.repository, metadata.repository_url);
   }
 
-  console.log(`[migrate] Migration complete: ${commits?.length ?? 0} commits, ${pulls?.length ?? 0} PRs, ${releases?.length ?? 0} releases, ${issues?.length ?? 0} issues`);
+  console.log(
+    `[migrate] Migration complete: ${commits?.length ?? 0} commits, ${pulls?.length ?? 0} PRs, ${releases?.length ?? 0} releases, ${issues?.length ?? 0} issues`,
+  );
   return true;
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { deleteRepository } from "@/lib/db";
 
 export async function DELETE(request: NextRequest) {
@@ -6,10 +6,7 @@ export async function DELETE(request: NextRequest) {
     const repoKey = request.nextUrl.searchParams.get("key");
 
     if (!repoKey) {
-      return NextResponse.json(
-        { error: "key is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "key is required" }, { status: 400 });
     }
 
     await deleteRepository(repoKey);

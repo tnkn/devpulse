@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 
 interface Props {
@@ -19,7 +19,7 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
       setStartDate(value);
       onFilterChange(value || null, endDate || null);
     },
-    [endDate, onFilterChange]
+    [endDate, onFilterChange],
   );
 
   const handleEndChange = useCallback(
@@ -27,7 +27,7 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
       setEndDate(value);
       onFilterChange(startDate || null, value || null);
     },
-    [startDate, onFilterChange]
+    [startDate, onFilterChange],
   );
 
   const handleReset = useCallback(() => {
@@ -49,14 +49,20 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
       setEndDate(endStr);
       onFilterChange(startStr, endStr);
     },
-    [onFilterChange]
+    [onFilterChange],
   );
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600 dark:text-gray-400">{t.dateFilter.from}</label>
+        <label
+          htmlFor="date-range-from"
+          className="text-sm text-gray-600 dark:text-gray-400"
+        >
+          {t.dateFilter.from}
+        </label>
         <input
+          id="date-range-from"
           type="date"
           value={startDate}
           onChange={(e) => handleStartChange(e.target.value)}
@@ -66,8 +72,14 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
         />
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600 dark:text-gray-400">{t.dateFilter.to}</label>
+        <label
+          htmlFor="date-range-to"
+          className="text-sm text-gray-600 dark:text-gray-400"
+        >
+          {t.dateFilter.to}
+        </label>
         <input
+          id="date-range-to"
           type="date"
           value={endDate}
           onChange={(e) => handleEndChange(e.target.value)}
@@ -78,6 +90,7 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
       </div>
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={handleReset}
           className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
@@ -85,20 +98,25 @@ export function DateRangeFilter({ onFilterChange, minDate, maxDate }: Props) {
         </button>
       </div>
       <div className="flex items-center gap-2 ml-auto">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{t.dateFilter.quick}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {t.dateFilter.quick}
+        </span>
         <button
+          type="button"
           onClick={() => handlePreset(7)}
           className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
           7d
         </button>
         <button
+          type="button"
           onClick={() => handlePreset(30)}
           className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
           30d
         </button>
         <button
+          type="button"
           onClick={() => handlePreset(90)}
           className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >

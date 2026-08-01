@@ -1,18 +1,28 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import type { DORAMetrics, PeriodGranularity, PeriodMetrics, DeploymentFrequency, RevertRate, LeadTimePeriodStats, PeriodStats, PullRequest, Review, Commit } from "@/types";
+import { useMemo, useState } from "react";
 import {
+  ChangeFailureRateChart,
   DeploymentFrequencyChart,
   LeadTimeChart,
-  ChangeFailureRateChart,
-  RevertRateChart,
-  PRSizeChart,
   PickupTimeChart,
+  PRSizeChart,
+  RevertRateChart,
 } from "@/components/charts";
 import { DateRangeFilter, ExportButtons } from "@/components/ui";
 import { useI18n } from "@/lib/i18n";
 import { formatPeriod } from "@/lib/i18n/format";
+import type {
+  Commit,
+  DeploymentFrequency,
+  DORAMetrics,
+  LeadTimePeriodStats,
+  PeriodGranularity,
+  PeriodMetrics,
+  PullRequest,
+  RevertRate,
+  Review,
+} from "@/types";
 
 interface Props {
   metrics: DORAMetrics;
@@ -27,13 +37,13 @@ interface Props {
 function periodToDate(period: string): Date {
   // YYYY-MM-DD (day)
   if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
-    return new Date(period + "T00:00:00");
+    return new Date(`${period}T00:00:00`);
   }
   // YYYY-Www (week)
   if (period.includes("-W")) {
     const [yearStr, weekStr] = period.split("-W");
-    const year = parseInt(yearStr);
-    const week = parseInt(weekStr);
+    const year = parseInt(yearStr, 10);
+    const week = parseInt(weekStr, 10);
     const jan4 = new Date(year, 0, 4);
     const dow = jan4.getDay() || 7;
     const firstMonday = new Date(jan4);
@@ -44,7 +54,7 @@ function periodToDate(period: string): Date {
   }
   // YYYY-MM (month)
   const [year, month] = period.split("-");
-  return new Date(parseInt(year), parseInt(month) - 1, 1);
+  return new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
 }
 
 const granularityKeys = ["day", "week", "month"] as const;
@@ -63,7 +73,15 @@ function countBusinessDays(start: Date, end: Date): number {
   return Math.max(count, 1);
 }
 
-export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFullName, pulls, reviews, commits }: Props) {
+export function MetricsDashboard({
+  metrics,
+  allPeriodMetrics,
+  repoName,
+  repoFullName,
+  pulls,
+  reviews,
+  commits,
+}: Props) {
   const { t } = useI18n();
   const [dateRange, setDateRange] = useState<{
     start: string | null;
@@ -117,31 +135,31 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
     return {
       deployment_frequency: activeMetrics.deployment_frequency.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
-      lead_time_for_changes: activeMetrics.lead_time_for_changes.filter((item) =>
-        isInRange(item.merged_at)
+      lead_time_for_changes: activeMetrics.lead_time_for_changes.filter(
+        (item) => isInRange(item.merged_at),
       ),
       lead_time_stats: activeMetrics.lead_time_stats.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
       change_failure_rate: activeMetrics.change_failure_rate.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
       revert_rate: activeMetrics.revert_rate.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
       pr_size: activeMetrics.pr_size.filter((item) =>
-        isInRange(item.merged_at)
+        isInRange(item.merged_at),
       ),
       pr_size_stats: activeMetrics.pr_size_stats.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
       pickup_time: activeMetrics.pickup_time.filter((item) =>
-        isInRange(item.first_review_at)
+        isInRange(item.first_review_at),
       ),
       pickup_time_stats: activeMetrics.pickup_time_stats.filter((item) =>
-        isPeriodInRange(item.period)
+        isPeriodInRange(item.period),
       ),
     };
   }, [activeMetrics, dateRange]);
@@ -170,17 +188,30 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
       rangeEnd = endDate;
     } else {
       const dates = merged.map((pr) => new Date(pr.merged_at!));
-      rangeStart = startDate ?? new Date(Math.min(...dates.map((d) => d.getTime())));
-      rangeEnd = endDate ?? new Date(Math.max(...dates.map((d) => d.getTime())));
+      rangeStart =
+        startDate ?? new Date(Math.min(...dates.map((d) => d.getTime())));
+      rangeEnd =
+        endDate ?? new Date(Math.max(...dates.map((d) => d.getTime())));
     }
     const bizDays = countBusinessDays(rangeStart, rangeEnd);
 
-    const byUser = new Map<string, { count: number; additions: number; deletions: number }>();
+    const byUser = new Map<
+      string,
+      { count: number; additions: number; deletions: number }
+    >();
     for (const pr of merged) {
       // Use assignees if available, otherwise fall back to user_login
-      const logins = pr.assignees?.length ? pr.assignees : pr.user_login ? [pr.user_login] : [];
+      const logins = pr.assignees?.length
+        ? pr.assignees
+        : pr.user_login
+          ? [pr.user_login]
+          : [];
       for (const login of logins) {
-        const cur = byUser.get(login) ?? { count: 0, additions: 0, deletions: 0 };
+        const cur = byUser.get(login) ?? {
+          count: 0,
+          additions: 0,
+          deletions: 0,
+        };
         cur.count++;
         cur.additions += pr.additions ?? 0;
         cur.deletions += pr.deletions ?? 0;
@@ -214,9 +245,15 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
     if (filtered.length === 0) return [];
 
-    const byUser = new Map<string, { prNumbers: Set<number>; totalCount: number }>();
+    const byUser = new Map<
+      string,
+      { prNumbers: Set<number>; totalCount: number }
+    >();
     for (const r of filtered) {
-      const cur = byUser.get(r.user_login) ?? { prNumbers: new Set<number>(), totalCount: 0 };
+      const cur = byUser.get(r.user_login) ?? {
+        prNumbers: new Set<number>(),
+        totalCount: 0,
+      };
       cur.prNumbers.add(r.pr_number);
       cur.totalCount++;
       byUser.set(r.user_login, cur);
@@ -263,9 +300,12 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
           <div className="flex items-center gap-4">
             <DateRangeFilter onFilterChange={handleFilterChange} />
             <div className="flex items-center gap-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <span className="text-sm text-gray-500 dark:text-gray-400 mr-1">{t.metrics.period}:</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400 mr-1">
+                {t.metrics.period}:
+              </span>
               {granularityKeys.map((g) => (
                 <button
+                  type="button"
                   key={g}
                   onClick={() => setGranularity(g)}
                   className={`px-3 py-1 text-sm rounded transition-colors ${
@@ -279,30 +319,39 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
               ))}
             </div>
           </div>
-          <ExportButtons
-            metrics={filteredMetrics}
-            repoName={repoName}
-          />
+          <ExportButtons metrics={filteredMetrics} repoName={repoName} />
         </div>
       </section>
 
       {/* Charts Grid */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">{t.metrics.metricsCharts}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {t.metrics.metricsCharts}
+        </h2>
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h3 className="text-lg font-medium mb-4">{t.metrics.deploymentFrequency}</h3>
-            <DeploymentFrequencyChart data={filteredMetrics.deployment_frequency} />
+            <h3 className="text-lg font-medium mb-4">
+              {t.metrics.deploymentFrequency}
+            </h3>
+            <DeploymentFrequencyChart
+              data={filteredMetrics.deployment_frequency}
+            />
           </div>
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h3 className="text-lg font-medium mb-4">{t.metrics.leadTimeForChanges}</h3>
+            <h3 className="text-lg font-medium mb-4">
+              {t.metrics.leadTimeForChanges}
+            </h3>
             <LeadTimeChart data={filteredMetrics.lead_time_stats} />
           </div>
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h3 className="text-lg font-medium mb-4">{t.metrics.changeFailureRate}</h3>
-            <ChangeFailureRateChart data={filteredMetrics.change_failure_rate} />
+            <h3 className="text-lg font-medium mb-4">
+              {t.metrics.changeFailureRate}
+            </h3>
+            <ChangeFailureRateChart
+              data={filteredMetrics.change_failure_rate}
+            />
           </div>
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -316,7 +365,9 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
           </div>
 
           <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h3 className="text-lg font-medium mb-4">{t.metrics.timeToFirstReview}</h3>
+            <h3 className="text-lg font-medium mb-4">
+              {t.metrics.timeToFirstReview}
+            </h3>
             <PickupTimeChart data={filteredMetrics.pickup_time_stats} />
           </div>
         </div>
@@ -330,9 +381,13 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
         {/* Period Summary Table (Merge Frequency + Revert Rate + Lead Time) */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">{t.metrics.periodSummary}</h3>
+          <h3 className="text-lg font-medium mb-3">
+            {t.metrics.periodSummary}
+          </h3>
           {filteredMetrics.deployment_frequency.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">{t.metrics.noDataAvailable}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {t.metrics.noDataAvailable}
+            </p>
           ) : (
             <PeriodSummaryTable
               deploymentFrequency={filteredMetrics.deployment_frequency}
@@ -345,18 +400,26 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
         {/* Change Failure Rate Table */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">{t.metrics.changeFailureRate}</h3>
+          <h3 className="text-lg font-medium mb-3">
+            {t.metrics.changeFailureRate}
+          </h3>
           {filteredMetrics.change_failure_rate.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">{t.metrics.noDeploymentData}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {t.metrics.noDeploymentData}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-2 px-4">{t.metrics.periodHeader}</th>
+                    <th className="text-left py-2 px-4">
+                      {t.metrics.periodHeader}
+                    </th>
                     <th className="text-right py-2 px-4">{t.metrics.total}</th>
                     <th className="text-right py-2 px-4">{t.metrics.failed}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.failureRate}</th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.failureRate}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -366,9 +429,15 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
                       <td className="py-2 px-4">{formatPeriod(item.period)}</td>
-                      <td className="text-right py-2 px-4">{item.total_deployments}</td>
-                      <td className="text-right py-2 px-4">{item.failed_deployments}</td>
-                      <td className="text-right py-2 px-4">{item.failure_rate}%</td>
+                      <td className="text-right py-2 px-4">
+                        {item.total_deployments}
+                      </td>
+                      <td className="text-right py-2 px-4">
+                        {item.failed_deployments}
+                      </td>
+                      <td className="text-right py-2 px-4">
+                        {item.failure_rate}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -379,9 +448,13 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
         {/* Lead Time per-PR Table */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">{t.metrics.leadTimePerPR}</h3>
+          <h3 className="text-lg font-medium mb-3">
+            {t.metrics.leadTimePerPR}
+          </h3>
           {filteredMetrics.lead_time_for_changes.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">{t.metrics.noMergedPRData}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {t.metrics.noMergedPRData}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -389,20 +462,29 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="text-left py-2 px-4">{t.metrics.pr}</th>
                     <th className="text-left py-2 px-4">{t.metrics.title}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.leadTimeHours}</th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.leadTimeHours}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...filteredMetrics.lead_time_for_changes].sort((a, b) => b.lead_time_hours - a.lead_time_hours).slice(0, 30).map((item) => (
-                    <tr
-                      key={item.pr_number}
-                      className="border-b border-gray-100 dark:border-gray-800"
-                    >
-                      <td className="py-2 px-4">#{item.pr_number}</td>
-                      <td className="py-2 px-4 max-w-md truncate">{item.title}</td>
-                      <td className="text-right py-2 px-4">{item.lead_time_hours}</td>
-                    </tr>
-                  ))}
+                  {[...filteredMetrics.lead_time_for_changes]
+                    .sort((a, b) => b.lead_time_hours - a.lead_time_hours)
+                    .slice(0, 30)
+                    .map((item) => (
+                      <tr
+                        key={item.pr_number}
+                        className="border-b border-gray-100 dark:border-gray-800"
+                      >
+                        <td className="py-2 px-4">#{item.pr_number}</td>
+                        <td className="py-2 px-4 max-w-md truncate">
+                          {item.title}
+                        </td>
+                        <td className="text-right py-2 px-4">
+                          {item.lead_time_hours}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -411,9 +493,13 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
         {/* PR Size Table */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">{t.metrics.changeSizeLOC}</h3>
+          <h3 className="text-lg font-medium mb-3">
+            {t.metrics.changeSizeLOC}
+          </h3>
           {filteredMetrics.pr_size.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">{t.metrics.noPRSizeData}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {t.metrics.noPRSizeData}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -421,9 +507,15 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="text-left py-2 px-4">{t.metrics.pr}</th>
                     <th className="text-left py-2 px-4">{t.metrics.title}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.additions}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.deletions}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.totalLOC}</th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.additions}
+                    </th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.deletions}
+                    </th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.totalLOC}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -433,10 +525,18 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
                       <td className="py-2 px-4">#{item.pr_number}</td>
-                      <td className="py-2 px-4 max-w-md truncate">{item.title}</td>
-                      <td className="text-right py-2 px-4 text-green-600">+{item.additions}</td>
-                      <td className="text-right py-2 px-4 text-red-600">-{item.deletions}</td>
-                      <td className="text-right py-2 px-4">{item.total_lines}</td>
+                      <td className="py-2 px-4 max-w-md truncate">
+                        {item.title}
+                      </td>
+                      <td className="text-right py-2 px-4 text-green-600">
+                        +{item.additions}
+                      </td>
+                      <td className="text-right py-2 px-4 text-red-600">
+                        -{item.deletions}
+                      </td>
+                      <td className="text-right py-2 px-4">
+                        {item.total_lines}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -447,9 +547,13 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
         {/* Pick-up Time Table */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">{t.metrics.timeToFirstReview}</h3>
+          <h3 className="text-lg font-medium mb-3">
+            {t.metrics.timeToFirstReview}
+          </h3>
           {filteredMetrics.pickup_time.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">{t.metrics.noReviewData}</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {t.metrics.noReviewData}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -457,7 +561,9 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="text-left py-2 px-4">{t.metrics.pr}</th>
                     <th className="text-left py-2 px-4">{t.metrics.title}</th>
-                    <th className="text-right py-2 px-4">{t.metrics.timeToFirstReviewHours}</th>
+                    <th className="text-right py-2 px-4">
+                      {t.metrics.timeToFirstReviewHours}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -467,8 +573,12 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
                       <td className="py-2 px-4">#{item.pr_number}</td>
-                      <td className="py-2 px-4 max-w-md truncate">{item.title}</td>
-                      <td className="text-right py-2 px-4">{item.pickup_time_hours}</td>
+                      <td className="py-2 px-4 max-w-md truncate">
+                        {item.title}
+                      </td>
+                      <td className="text-right py-2 px-4">
+                        {item.pickup_time_hours}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,31 +592,56 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
 
       {/* Per-Person Metrics */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">{t.metrics.perPersonPRMetrics}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {t.metrics.perPersonPRMetrics}
+        </h2>
         {perPersonPR.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">{t.metrics.noPRAuthorData}</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            {t.metrics.noPRAuthorData}
+          </p>
         ) : (
           <div className="overflow-x-auto mb-6">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="text-left py-2 px-4">{t.metrics.user}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.mergedPRs}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.avgPRsPerBusinessDay}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.additions}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.deletions}</th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.mergedPRs}
+                  </th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.avgPRsPerBusinessDay}
+                  </th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.additions}
+                  </th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.deletions}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {perPersonPR.map((row) => (
-                  <tr key={row.login} className="border-b border-gray-100 dark:border-gray-800">
+                  <tr
+                    key={row.login}
+                    className="border-b border-gray-100 dark:border-gray-800"
+                  >
                     <td className="py-2 px-4">
-                      <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={() => setSelectedUser(row.login)}>{row.login}</button>
+                      <button
+                        type="button"
+                        className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        onClick={() => setSelectedUser(row.login)}
+                      >
+                        {row.login}
+                      </button>
                     </td>
                     <td className="text-right py-2 px-4">{row.count}</td>
                     <td className="text-right py-2 px-4">{row.avgPerDay}</td>
-                    <td className="text-right py-2 px-4 text-green-600">+{row.additions}</td>
-                    <td className="text-right py-2 px-4 text-red-600">-{row.deletions}</td>
+                    <td className="text-right py-2 px-4 text-green-600">
+                      +{row.additions}
+                    </td>
+                    <td className="text-right py-2 px-4 text-red-600">
+                      -{row.deletions}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -514,24 +649,41 @@ export function MetricsDashboard({ metrics, allPeriodMetrics, repoName, repoFull
           </div>
         )}
 
-        <h2 className="text-xl font-semibold mb-4">{t.metrics.perPersonReviewMetrics}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {t.metrics.perPersonReviewMetrics}
+        </h2>
         {perPersonReview.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">{t.metrics.noReviewerData}</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            {t.metrics.noReviewerData}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="text-left py-2 px-4">{t.metrics.user}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.reviewedPRsUnique}</th>
-                  <th className="text-right py-2 px-4">{t.metrics.reviewCount}</th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.reviewedPRsUnique}
+                  </th>
+                  <th className="text-right py-2 px-4">
+                    {t.metrics.reviewCount}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {perPersonReview.map((row) => (
-                  <tr key={row.login} className="border-b border-gray-100 dark:border-gray-800">
+                  <tr
+                    key={row.login}
+                    className="border-b border-gray-100 dark:border-gray-800"
+                  >
                     <td className="py-2 px-4">
-                      <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={() => setSelectedUser(row.login)}>{row.login}</button>
+                      <button
+                        type="button"
+                        className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        onClick={() => setSelectedUser(row.login)}
+                      >
+                        {row.login}
+                      </button>
                     </td>
                     <td className="text-right py-2 px-4">{row.uniquePRs}</td>
                     <td className="text-right py-2 px-4">{row.totalCount}</td>
@@ -581,7 +733,9 @@ function PersonActivityModal({
   onClose: () => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
-  const [activeTab, setActiveTab] = useState<"prs" | "commits" | "reviews">("prs");
+  const [activeTab, setActiveTab] = useState<"prs" | "commits" | "reviews">(
+    "prs",
+  );
   const startDate = dateRange.start ? new Date(dateRange.start) : null;
   const endDate = dateRange.end ? new Date(dateRange.end) : null;
 
@@ -590,14 +744,19 @@ function PersonActivityModal({
     return pulls
       .filter((pr) => {
         if (!pr.merged_at) return false;
-        const assigned = pr.assignees?.length ? pr.assignees.includes(login) : pr.user_login === login;
+        const assigned = pr.assignees?.length
+          ? pr.assignees.includes(login)
+          : pr.user_login === login;
         if (!assigned) return false;
         const d = new Date(pr.merged_at);
         if (startDate && d < startDate) return false;
         if (endDate && d > endDate) return false;
         return true;
       })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
   }, [pulls, login, startDate, endDate]);
 
   // Build sha → PR lookup for related PR column
@@ -623,7 +782,10 @@ function PersonActivityModal({
         if (endDate && d > endDate) return false;
         return true;
       })
-      .sort((a, b) => new Date(b.author.date).getTime() - new Date(a.author.date).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.author.date).getTime() - new Date(a.author.date).getTime(),
+      );
   }, [commits, login, loginToEmails, startDate, endDate]);
 
   // User's reviews in date range
@@ -636,7 +798,11 @@ function PersonActivityModal({
         if (endDate && d > endDate) return false;
         return true;
       })
-      .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.submitted_at).getTime() -
+          new Date(a.submitted_at).getTime(),
+      );
   }, [reviews, login, startDate, endDate]);
 
   // PR number → PR lookup for review tab
@@ -650,20 +816,41 @@ function PersonActivityModal({
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
-          <h2 className="text-lg font-semibold">{t.metrics.activityHistory(login)}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none px-2">&times;</button>
+          <h2 className="text-lg font-semibold">
+            {t.metrics.activityHistory(login)}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none px-2"
+          >
+            &times;
+          </button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700 px-4">
           <button
+            type="button"
             onClick={() => setActiveTab("prs")}
             className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "prs"
@@ -674,6 +861,7 @@ function PersonActivityModal({
             {t.metrics.mergedPRsTab} ({userPRs.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("commits")}
             className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "commits"
@@ -684,6 +872,7 @@ function PersonActivityModal({
             {t.metrics.commitHistory} ({userCommits.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("reviews")}
             className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "reviews"
@@ -697,73 +886,124 @@ function PersonActivityModal({
 
         <div className="p-4">
           {/* Created PRs Tab */}
-          {activeTab === "prs" && (
-            userPRs.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noMergedPRData}</p>
+          {activeTab === "prs" &&
+            (userPRs.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                {t.metrics.noMergedPRData}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-2 px-3">{t.metrics.createdDate}</th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.createdDate}
+                      </th>
                       <th className="text-left py-2 px-3">{t.metrics.pr}</th>
-                      <th className="text-left py-2 px-3">{t.metrics.mergedDate}</th>
-                      <th className="text-right py-2 px-3">{t.metrics.timeToMerge}</th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.mergedDate}
+                      </th>
+                      <th className="text-right py-2 px-3">
+                        {t.metrics.timeToMerge}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {userPRs.map((pr) => {
                       const leadHours = pr.merged_at
-                        ? Math.round((new Date(pr.merged_at).getTime() - new Date(pr.created_at).getTime()) / 3600000 * 10) / 10
+                        ? Math.round(
+                            ((new Date(pr.merged_at).getTime() -
+                              new Date(pr.created_at).getTime()) /
+                              3600000) *
+                              10,
+                          ) / 10
                         : null;
                       return (
-                        <tr key={pr.number} className="border-b border-gray-100 dark:border-gray-800">
-                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(pr.created_at)}</td>
+                        <tr
+                          key={pr.number}
+                          className="border-b border-gray-100 dark:border-gray-800"
+                        >
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            {formatDate(pr.created_at)}
+                          </td>
                           <td className="py-2 px-3">
-                            <a href={`https://github.com/${repoFullName}/pull/${pr.number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            <a
+                              href={`https://github.com/${repoFullName}/pull/${pr.number}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
                               #{pr.number}
                             </a>{" "}
-                            <span className="max-w-xs truncate inline-block align-bottom">{pr.title}</span>
+                            <span className="max-w-xs truncate inline-block align-bottom">
+                              {pr.title}
+                            </span>
                           </td>
-                          <td className="py-2 px-3 whitespace-nowrap">{pr.merged_at ? formatDate(pr.merged_at) : "-"}</td>
-                          <td className="text-right py-2 px-3">{leadHours ?? "-"}</td>
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            {pr.merged_at ? formatDate(pr.merged_at) : "-"}
+                          </td>
+                          <td className="text-right py-2 px-3">
+                            {leadHours ?? "-"}
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-            )
-          )}
+            ))}
 
           {/* Commits Tab */}
-          {activeTab === "commits" && (
-            userCommits.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noCommitData}</p>
+          {activeTab === "commits" &&
+            (userCommits.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                {t.metrics.noCommitData}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-2 px-3">{t.metrics.commitDate}</th>
-                      <th className="text-left py-2 px-3">{t.metrics.commitMessage}</th>
-                      <th className="text-left py-2 px-3">{t.metrics.relatedPR}</th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.commitDate}
+                      </th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.commitMessage}
+                      </th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.relatedPR}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {userCommits.slice(0, 100).map((c) => {
                       const relatedPR = shaTopr.get(c.sha);
                       return (
-                        <tr key={c.sha} className="border-b border-gray-100 dark:border-gray-800">
-                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(c.author.date)}</td>
+                        <tr
+                          key={c.sha}
+                          className="border-b border-gray-100 dark:border-gray-800"
+                        >
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            {formatDate(c.author.date)}
+                          </td>
                           <td className="py-2 px-3 max-w-md truncate">
-                            <a href={`https://github.com/${repoFullName}/commit/${c.sha}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                            <a
+                              href={`https://github.com/${repoFullName}/commit/${c.sha}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
                               {c.message.split("\n")[0]}
                             </a>
                           </td>
                           <td className="py-2 px-3">
                             {relatedPR ? (
-                              <a href={`https://github.com/${repoFullName}/pull/${relatedPR.number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                              <a
+                                href={`https://github.com/${repoFullName}/pull/${relatedPR.number}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline"
+                              >
                                 #{relatedPR.number} {relatedPR.title}
                               </a>
                             ) : (
@@ -776,41 +1016,66 @@ function PersonActivityModal({
                   </tbody>
                 </table>
               </div>
-            )
-          )}
+            ))}
 
           {/* Reviews Tab */}
-          {activeTab === "reviews" && (
-            userReviews.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-sm">{t.metrics.noReviewActivityData}</p>
+          {activeTab === "reviews" &&
+            (userReviews.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                {t.metrics.noReviewActivityData}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-2 px-3">{t.metrics.reviewDate}</th>
-                      <th className="text-left py-2 px-3">{t.metrics.reviewedPR}</th>
-                      <th className="text-left py-2 px-3">{t.metrics.reviewState}</th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.reviewDate}
+                      </th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.reviewedPR}
+                      </th>
+                      <th className="text-left py-2 px-3">
+                        {t.metrics.reviewState}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {userReviews.slice(0, 100).map((r) => {
                       const pr = prByNumber.get(r.pr_number);
                       return (
-                        <tr key={r.id} className="border-b border-gray-100 dark:border-gray-800">
-                          <td className="py-2 px-3 whitespace-nowrap">{formatDate(r.submitted_at)}</td>
-                          <td className="py-2 px-3">
-                            <a href={`https://github.com/${repoFullName}/pull/${r.pr_number}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                              #{r.pr_number}
-                            </a>{" "}
-                            {pr && <span className="max-w-xs truncate inline-block align-bottom">{pr.title}</span>}
+                        <tr
+                          key={r.id}
+                          className="border-b border-gray-100 dark:border-gray-800"
+                        >
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            {formatDate(r.submitted_at)}
                           </td>
                           <td className="py-2 px-3">
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                              r.state === "APPROVED" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
-                              r.state === "CHANGES_REQUESTED" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" :
-                              "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                            }`}>
+                            <a
+                              href={`https://github.com/${repoFullName}/pull/${r.pr_number}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              #{r.pr_number}
+                            </a>{" "}
+                            {pr && (
+                              <span className="max-w-xs truncate inline-block align-bottom">
+                                {pr.title}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                                r.state === "APPROVED"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                                  : r.state === "CHANGES_REQUESTED"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                              }`}
+                            >
                               {r.state}
                             </span>
                           </td>
@@ -820,8 +1085,7 @@ function PersonActivityModal({
                   </tbody>
                 </table>
               </div>
-            )
-          )}
+            ))}
         </div>
       </div>
     </div>
@@ -841,9 +1105,9 @@ function PeriodSummaryTable({
 }) {
   // Collect all unique periods
   const periods = new Set<string>();
-  deploymentFrequency.forEach((d) => periods.add(d.period));
-  revertRate.forEach((r) => periods.add(r.period));
-  leadTimeStats.forEach((l) => periods.add(l.period));
+  for (const d of deploymentFrequency) periods.add(d.period);
+  for (const r of revertRate) periods.add(r.period);
+  for (const l of leadTimeStats) periods.add(l.period);
 
   const sortedPeriods = [...periods].sort();
 
@@ -860,7 +1124,9 @@ function PeriodSummaryTable({
             <th className="text-left py-2 px-3">{t.metrics.periodHeader}</th>
             <th className="text-right py-2 px-3">{t.metrics.merges}</th>
             <th className="text-right py-2 px-3">{t.metrics.reverts}</th>
-            <th className="text-right py-2 px-3">{t.metrics.revertRateHeader}</th>
+            <th className="text-right py-2 px-3">
+              {t.metrics.revertRateHeader}
+            </th>
             <th className="text-right py-2 px-3">{t.metrics.avgLeadTimeH}</th>
             <th className="text-right py-2 px-3">{t.metrics.sigmaH}</th>
           </tr>
@@ -877,12 +1143,16 @@ function PeriodSummaryTable({
               >
                 <td className="py-2 px-3">{formatPeriod(period)}</td>
                 <td className="text-right py-2 px-3">{df?.count ?? "-"}</td>
-                <td className="text-right py-2 px-3">{rr?.revert_commits ?? "-"}</td>
+                <td className="text-right py-2 px-3">
+                  {rr?.revert_commits ?? "-"}
+                </td>
                 <td className="text-right py-2 px-3">
                   {rr ? `${rr.revert_rate}%` : "-"}
                 </td>
                 <td className="text-right py-2 px-3">{lt?.avg_hours ?? "-"}</td>
-                <td className="text-right py-2 px-3">{lt?.stddev_hours ?? "-"}</td>
+                <td className="text-right py-2 px-3">
+                  {lt?.stddev_hours ?? "-"}
+                </td>
               </tr>
             );
           })}

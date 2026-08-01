@@ -1,6 +1,6 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
+import { decrypt, encrypt } from "@/lib/crypto";
 import { getTokenConnection } from "@/lib/db/tokens";
-import { encrypt, decrypt } from "@/lib/crypto";
 import type { GitHubTokenMasked } from "@/types";
 
 export function isTokenUIAllowed(): boolean {
@@ -11,7 +11,7 @@ export async function listTokens(): Promise<GitHubTokenMasked[]> {
   const conn = await getTokenConnection();
   try {
     const reader = await conn.runAndReadAll(
-      "SELECT id, label, token_suffix, is_default, created_at, updated_at FROM github_tokens ORDER BY created_at"
+      "SELECT id, label, token_suffix, is_default, created_at, updated_at FROM github_tokens ORDER BY created_at",
     );
     const rows = reader.getRows();
     return rows.map((row) => ({
@@ -29,7 +29,7 @@ export async function listTokens(): Promise<GitHubTokenMasked[]> {
 
 export async function addToken(
   label: string,
-  token: string
+  token: string,
 ): Promise<GitHubTokenMasked> {
   const id = randomUUID();
   const suffix = token.slice(-4);
@@ -39,7 +39,7 @@ export async function addToken(
   try {
     // If this is the first token, make it default
     const countReader = await conn.runAndReadAll(
-      "SELECT COUNT(*) FROM github_tokens"
+      "SELECT COUNT(*) FROM github_tokens",
     );
     const countRows = countReader.getRows();
     const count = Number(countRows[0][0]);
@@ -47,7 +47,7 @@ export async function addToken(
 
     await conn.run(
       `INSERT INTO github_tokens (id, label, encrypted_token, iv, auth_tag, token_suffix, is_default)
-       VALUES ('${id}', '${label.replace(/'/g, "''")}', '${ciphertext}', '${iv}', '${authTag}', '${suffix}', ${isDefault})`
+       VALUES ('${id}', '${label.replace(/'/g, "''")}', '${ciphertext}', '${iv}', '${authTag}', '${suffix}', ${isDefault})`,
     );
 
     return {
@@ -65,13 +65,13 @@ export async function addToken(
 
 export async function updateToken(
   id: string,
-  updates: { label?: string; is_default?: boolean }
+  updates: { label?: string; is_default?: boolean },
 ): Promise<void> {
   const conn = await getTokenConnection();
   try {
     if (updates.is_default) {
       await conn.run(
-        "UPDATE github_tokens SET is_default = FALSE WHERE is_default = TRUE"
+        "UPDATE github_tokens SET is_default = FALSE WHERE is_default = TRUE",
       );
     }
 
@@ -82,12 +82,10 @@ export async function updateToken(
     if (updates.is_default !== undefined) {
       sets.push(`is_default = ${updates.is_default}`);
     }
-    sets.push(
-      `updated_at = strftime(now(), '%Y-%m-%dT%H:%M:%SZ')`
-    );
+    sets.push(`updated_at = strftime(now(), '%Y-%m-%dT%H:%M:%SZ')`);
 
     await conn.run(
-      `UPDATE github_tokens SET ${sets.join(", ")} WHERE id = '${id}'`
+      `UPDATE github_tokens SET ${sets.join(", ")} WHERE id = '${id}'`,
     );
   } finally {
     conn.closeSync();
@@ -99,7 +97,7 @@ export async function deleteToken(id: string): Promise<void> {
   try {
     // Check if we're deleting the default token
     const reader = await conn.runAndReadAll(
-      `SELECT is_default FROM github_tokens WHERE id = '${id}'`
+      `SELECT is_default FROM github_tokens WHERE id = '${id}'`,
     );
     const rows = reader.getRows();
     const wasDefault = rows.length > 0 && Boolean(rows[0][0]);
@@ -110,7 +108,7 @@ export async function deleteToken(id: string): Promise<void> {
     if (wasDefault) {
       await conn.run(
         `UPDATE github_tokens SET is_default = TRUE
-         WHERE id = (SELECT id FROM github_tokens ORDER BY created_at LIMIT 1)`
+         WHERE id = (SELECT id FROM github_tokens ORDER BY created_at LIMIT 1)`,
       );
     }
   } finally {
@@ -129,7 +127,7 @@ export async function getAllDecryptedTokens(): Promise<string[]> {
     const conn = await getTokenConnection();
     try {
       const reader = await conn.runAndReadAll(
-        "SELECT encrypted_token, iv, auth_tag FROM github_tokens ORDER BY is_default DESC, created_at"
+        "SELECT encrypted_token, iv, auth_tag FROM github_tokens ORDER BY is_default DESC, created_at",
       );
       const rows = reader.getRows();
       for (const row of rows) {
@@ -164,7 +162,7 @@ export async function getDecryptedDefaultToken(): Promise<string | null> {
   const conn = await getTokenConnection();
   try {
     const reader = await conn.runAndReadAll(
-      "SELECT encrypted_token, iv, auth_tag FROM github_tokens WHERE is_default = TRUE LIMIT 1"
+      "SELECT encrypted_token, iv, auth_tag FROM github_tokens WHERE is_default = TRUE LIMIT 1",
     );
     const rows = reader.getRows();
     if (rows.length === 0) return null;
@@ -183,7 +181,7 @@ export async function getDecryptedToken(id: string): Promise<string | null> {
   const conn = await getTokenConnection();
   try {
     const reader = await conn.runAndReadAll(
-      `SELECT encrypted_token, iv, auth_tag FROM github_tokens WHERE id = '${id}'`
+      `SELECT encrypted_token, iv, auth_tag FROM github_tokens WHERE id = '${id}'`,
     );
     const rows = reader.getRows();
     if (rows.length === 0) return null;
@@ -199,7 +197,7 @@ export async function getDecryptedToken(id: string): Promise<string | null> {
 }
 
 export async function testToken(
-  token: string
+  token: string,
 ): Promise<{ valid: boolean; login?: string; error?: string }> {
   try {
     const res = await fetch("https://api.github.com/user", {

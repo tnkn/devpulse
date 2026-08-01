@@ -1,13 +1,14 @@
+import type { DuckDBConnection } from "@duckdb/node-api";
+import { getConnection, getRepositoryKeys } from "@/lib/db";
 import type {
-  Repository,
-  DumpMetadata,
   Commit,
+  DumpMetadata,
+  Issue,
   PullRequest,
   Release,
-  Issue,
+  Repository,
   Review,
 } from "@/types";
-import { getConnection, getRepositoryKeys } from "@/lib/db";
 
 export async function getRepositories(): Promise<Repository[]> {
   const keys = await getRepositoryKeys();
@@ -17,22 +18,27 @@ export async function getRepositories(): Promise<Repository[]> {
     try {
       const conn = await getConnection(key);
       const reader = await conn.runAndReadAll(
-        "SELECT full_name, last_collected_at, token_id FROM metadata LIMIT 1"
+        "SELECT full_name, last_collected_at, token_id FROM metadata LIMIT 1",
       );
       const rows = reader.getRows();
       conn.closeSync();
 
-      const displayName = rows.length > 0 && rows[0][0]
-        ? String(rows[0][0])
-        : key.includes("__") ? key.replace("__", "/") : key;
-      const lastCollected = rows.length > 0 && rows[0][1]
-        ? String(rows[0][1])
-        : null;
-      const tokenId = rows.length > 0 && rows[0][2]
-        ? String(rows[0][2])
-        : null;
+      const displayName =
+        rows.length > 0 && rows[0][0]
+          ? String(rows[0][0])
+          : key.includes("__")
+            ? key.replace("__", "/")
+            : key;
+      const lastCollected =
+        rows.length > 0 && rows[0][1] ? String(rows[0][1]) : null;
+      const tokenId = rows.length > 0 && rows[0][2] ? String(rows[0][2]) : null;
 
-      repositories.push({ name: key, displayName, lastCollected, token_id: tokenId });
+      repositories.push({
+        name: key,
+        displayName,
+        lastCollected,
+        token_id: tokenId,
+      });
     } catch {
       // If DB access fails, still show the repo with minimal info
       repositories.push({
@@ -54,46 +60,77 @@ export async function getRepoData(repoName: string): Promise<{
   issues: Issue[];
   reviews: Review[];
 }> {
-  let conn;
+  let conn: DuckDBConnection;
   try {
     conn = await getConnection(repoName);
   } catch {
-    return { metadata: null, commits: [], pulls: [], releases: [], issues: [], reviews: [] };
+    return {
+      metadata: null,
+      commits: [],
+      pulls: [],
+      releases: [],
+      issues: [],
+      reviews: [],
+    };
   }
 
   try {
-    const [metaReader, commitReader, prReader, releaseReader, issueReader, reviewReader] = await Promise.all([
-      conn.runAndReadAll("SELECT full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id FROM metadata LIMIT 1"),
-      conn.runAndReadAll("SELECT sha, message, author_name, author_email, author_date, committer_name, committer_email, committer_date FROM commits ORDER BY author_date DESC"),
-      conn.runAndReadAll("SELECT number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login, assignees_json FROM pull_requests ORDER BY number DESC"),
-      conn.runAndReadAll("SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC"),
-      conn.runAndReadAll("SELECT number, title, state, created_at, updated_at, closed_at, labels_json FROM issues ORDER BY number DESC"),
-      conn.runAndReadAll("SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC"),
+    const [
+      metaReader,
+      commitReader,
+      prReader,
+      releaseReader,
+      issueReader,
+      reviewReader,
+    ] = await Promise.all([
+      conn.runAndReadAll(
+        "SELECT full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id FROM metadata LIMIT 1",
+      ),
+      conn.runAndReadAll(
+        "SELECT sha, message, author_name, author_email, author_date, committer_name, committer_email, committer_date FROM commits ORDER BY author_date DESC",
+      ),
+      conn.runAndReadAll(
+        "SELECT number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login, assignees_json FROM pull_requests ORDER BY number DESC",
+      ),
+      conn.runAndReadAll(
+        "SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC",
+      ),
+      conn.runAndReadAll(
+        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json FROM issues ORDER BY number DESC",
+      ),
+      conn.runAndReadAll(
+        "SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC",
+      ),
     ]);
 
     conn.closeSync();
 
     // Parse metadata
     const metaRows = metaReader.getRows();
-    const metadata: DumpMetadata | null = metaRows.length > 0
-      ? {
-          repository: String(metaRows[0][0]),
-          repository_url: String(metaRows[0][1]),
-          dumped_at: String(metaRows[0][2]),
-          commit_count: Number(metaRows[0][3]),
-          pull_request_count: Number(metaRows[0][4]),
-          release_count: Number(metaRows[0][5]),
-          issue_count: Number(metaRows[0][6]),
-          token_id: metaRows[0][7] != null ? String(metaRows[0][7]) : null,
-        }
-      : null;
+    const metadata: DumpMetadata | null =
+      metaRows.length > 0
+        ? {
+            repository: String(metaRows[0][0]),
+            repository_url: String(metaRows[0][1]),
+            dumped_at: String(metaRows[0][2]),
+            commit_count: Number(metaRows[0][3]),
+            pull_request_count: Number(metaRows[0][4]),
+            release_count: Number(metaRows[0][5]),
+            issue_count: Number(metaRows[0][6]),
+            token_id: metaRows[0][7] != null ? String(metaRows[0][7]) : null,
+          }
+        : null;
 
     // Parse commits
     const commits: Commit[] = commitReader.getRows().map((r) => ({
       sha: String(r[0]),
       message: String(r[1]),
       author: { name: String(r[2]), email: String(r[3]), date: String(r[4]) },
-      committer: { name: String(r[5]), email: String(r[6]), date: String(r[7]) },
+      committer: {
+        name: String(r[5]),
+        email: String(r[6]),
+        date: String(r[7]),
+      },
     }));
 
     // Parse pull requests
@@ -113,7 +150,16 @@ export async function getRepoData(repoName: string): Promise<{
       ...(r[14] != null ? { additions: Number(r[14]) } : {}),
       ...(r[15] != null ? { deletions: Number(r[15]) } : {}),
       ...(r[16] != null ? { user_login: String(r[16]) } : {}),
-      assignees: r[17] != null ? (() => { try { return JSON.parse(String(r[17])); } catch { return []; } })() : [],
+      assignees:
+        r[17] != null
+          ? (() => {
+              try {
+                return JSON.parse(String(r[17]));
+              } catch {
+                return [];
+              }
+            })()
+          : [],
     }));
 
     // Parse releases
@@ -151,7 +197,14 @@ export async function getRepoData(repoName: string): Promise<{
     return { metadata, commits, pulls, releases, issues, reviews };
   } catch {
     conn.closeSync();
-    return { metadata: null, commits: [], pulls: [], releases: [], issues: [], reviews: [] };
+    return {
+      metadata: null,
+      commits: [],
+      pulls: [],
+      releases: [],
+      issues: [],
+      reviews: [],
+    };
   }
 }
 

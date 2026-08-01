@@ -1,2 +1,2 @@
 export { listRepositories } from "./client";
-export { startCollection, getJob } from "./collector";
+export { getJob, startCollection } from "./collector";

@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useCallback } from "react";
-import { messages, type Locale, type Messages } from "./messages";
+import { createContext, useCallback, useContext } from "react";
+import { type Locale, type Messages, messages } from "./messages";
 
 interface I18nContextValue {
   locale: Locale;

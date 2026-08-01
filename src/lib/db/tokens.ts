@@ -1,7 +1,7 @@
-import { DuckDBInstance } from "@duckdb/node-api";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type { DuckDBConnection } from "@duckdb/node-api";
-import { promises as fs } from "fs";
-import path from "path";
+import { DuckDBInstance } from "@duckdb/node-api";
 import { TOKEN_SCHEMA_DDL } from "./schema";
 
 const DATA_DIR = process.env.DATA_DIR || "./data";

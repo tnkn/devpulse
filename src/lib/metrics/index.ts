@@ -1,18 +1,18 @@
 import type {
-  PullRequest,
+  ChangeFailureRate,
   Commit,
-  Review,
   DeploymentFrequency,
+  DORAMetrics,
   LeadTimeForChanges,
   LeadTimePeriodStats,
-  ChangeFailureRate,
-  RevertRate,
-  PRSize,
-  PickupTime,
-  PeriodStats,
-  DORAMetrics,
   PeriodGranularity,
   PeriodMetrics,
+  PeriodStats,
+  PickupTime,
+  PRSize,
+  PullRequest,
+  RevertRate,
+  Review,
 } from "@/types";
 
 function getPeriodKey(date: Date, granularity: PeriodGranularity): string {
@@ -30,7 +30,7 @@ function getPeriodKey(date: Date, granularity: PeriodGranularity): string {
       d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
       const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
       const weekNo = Math.ceil(
-        ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+        ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
       );
       return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
     }
@@ -39,11 +39,16 @@ function getPeriodKey(date: Date, granularity: PeriodGranularity): string {
   }
 }
 
-function getFrequencyLabel(granularity: PeriodGranularity): DeploymentFrequency["frequency"] {
+function getFrequencyLabel(
+  granularity: PeriodGranularity,
+): DeploymentFrequency["frequency"] {
   switch (granularity) {
-    case "day": return "daily";
-    case "week": return "weekly";
-    case "month": return "monthly";
+    case "day":
+      return "daily";
+    case "week":
+      return "weekly";
+    case "month":
+      return "monthly";
   }
 }
 
@@ -51,7 +56,7 @@ export function calculateDORAMetrics(
   pulls: PullRequest[],
   commits: Commit[],
   reviews: Review[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): DORAMetrics {
   return {
     deployment_frequency: calculateDeploymentFrequency(pulls, granularity),
@@ -69,7 +74,7 @@ export function calculateDORAMetrics(
 export function calculateAllPeriodMetrics(
   pulls: PullRequest[],
   commits: Commit[],
-  reviews: Review[] = []
+  reviews: Review[] = [],
 ): Record<PeriodGranularity, PeriodMetrics> {
   const granularities: PeriodGranularity[] = ["day", "week", "month"];
   const result = {} as Record<PeriodGranularity, PeriodMetrics>;
@@ -90,7 +95,7 @@ export function calculateAllPeriodMetrics(
 
 function calculateDeploymentFrequency(
   pulls: PullRequest[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): DeploymentFrequency[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
@@ -112,7 +117,7 @@ function calculateDeploymentFrequency(
 }
 
 function calculateLeadTimeForChanges(
-  pulls: PullRequest[]
+  pulls: PullRequest[],
 ): LeadTimeForChanges[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
@@ -133,13 +138,13 @@ function calculateLeadTimeForChanges(
     })
     .sort(
       (a, b) =>
-        new Date(b.merged_at).getTime() - new Date(a.merged_at).getTime()
+        new Date(b.merged_at).getTime() - new Date(a.merged_at).getTime(),
     );
 }
 
 function calculateLeadTimeStats(
   pulls: PullRequest[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): LeadTimePeriodStats[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
@@ -182,14 +187,11 @@ function calculateLeadTimeStats(
 
 function calculateChangeFailureRate(
   pulls: PullRequest[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): ChangeFailureRate[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
-  const periodStats = new Map<
-    string,
-    { total: number; failures: number }
-  >();
+  const periodStats = new Map<string, { total: number; failures: number }>();
 
   for (const pr of mergedPRs) {
     const date = new Date(pr.merged_at!);
@@ -223,14 +225,11 @@ function calculateChangeFailureRate(
 
 function calculateRevertRate(
   commits: Commit[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): RevertRate[] {
   const revertPattern = /^revert\b/i;
 
-  const periodStats = new Map<
-    string,
-    { total: number; reverts: number }
-  >();
+  const periodStats = new Map<string, { total: number; reverts: number }>();
 
   for (const commit of commits) {
     const date = new Date(commit.author.date);
@@ -264,7 +263,8 @@ function calculateRevertRate(
 
 function calculatePRSize(pulls: PullRequest[]): PRSize[] {
   const mergedPRs = pulls.filter(
-    (pr) => pr.merged_at && pr.additions !== undefined && pr.deletions !== undefined
+    (pr) =>
+      pr.merged_at && pr.additions !== undefined && pr.deletions !== undefined,
   );
 
   return mergedPRs
@@ -278,11 +278,14 @@ function calculatePRSize(pulls: PullRequest[]): PRSize[] {
     }))
     .sort(
       (a, b) =>
-        new Date(b.merged_at).getTime() - new Date(a.merged_at).getTime()
+        new Date(b.merged_at).getTime() - new Date(a.merged_at).getTime(),
     );
 }
 
-function calculatePickupTime(pulls: PullRequest[], reviews: Review[]): PickupTime[] {
+function calculatePickupTime(
+  pulls: PullRequest[],
+  reviews: Review[],
+): PickupTime[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
   // Build a map of pr_number → first human review
@@ -315,16 +318,18 @@ function calculatePickupTime(pulls: PullRequest[], reviews: Review[]): PickupTim
     })
     .sort(
       (a, b) =>
-        new Date(b.first_review_at).getTime() - new Date(a.first_review_at).getTime()
+        new Date(b.first_review_at).getTime() -
+        new Date(a.first_review_at).getTime(),
     );
 }
 
 function calculatePRSizeStats(
   pulls: PullRequest[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): PeriodStats[] {
   const mergedPRs = pulls.filter(
-    (pr) => pr.merged_at && pr.additions !== undefined && pr.deletions !== undefined
+    (pr) =>
+      pr.merged_at && pr.additions !== undefined && pr.deletions !== undefined,
   );
 
   const periodValues = new Map<string, number[]>();
@@ -365,7 +370,7 @@ function calculatePRSizeStats(
 function calculatePickupTimeStats(
   pulls: PullRequest[],
   reviews: Review[],
-  granularity: PeriodGranularity = "week"
+  granularity: PeriodGranularity = "week",
 ): PeriodStats[] {
   const mergedPRs = pulls.filter((pr) => pr.merged_at);
 
@@ -389,7 +394,10 @@ function calculatePickupTimeStats(
     const reviewDate = new Date(firstReviewAt);
     const key = getPeriodKey(reviewDate, granularity);
     const createdAt = new Date(pr.created_at);
-    const hours = Math.max(0, (reviewDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+    const hours = Math.max(
+      0,
+      (reviewDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60),
+    );
 
     const arr = periodValues.get(key) || [];
     arr.push(hours);
@@ -425,44 +433,40 @@ export function calculateSummary(metrics: DORAMetrics) {
     metrics.lead_time_for_changes.length > 0
       ? metrics.lead_time_for_changes.reduce(
           (sum, item) => sum + item.lead_time_hours,
-          0
+          0,
         ) / metrics.lead_time_for_changes.length
       : 0;
 
   const totalDeployments = metrics.deployment_frequency.reduce(
     (sum, item) => sum + item.count,
-    0
+    0,
   );
 
   const avgFailureRate =
     metrics.change_failure_rate.length > 0
       ? metrics.change_failure_rate.reduce(
           (sum, item) => sum + item.failure_rate,
-          0
+          0,
         ) / metrics.change_failure_rate.length
       : 0;
 
   const avgRevertRate =
     metrics.revert_rate.length > 0
-      ? metrics.revert_rate.reduce(
-          (sum, item) => sum + item.revert_rate,
-          0
-        ) / metrics.revert_rate.length
+      ? metrics.revert_rate.reduce((sum, item) => sum + item.revert_rate, 0) /
+        metrics.revert_rate.length
       : 0;
 
   const avgPRSize =
     metrics.pr_size.length > 0
-      ? metrics.pr_size.reduce(
-          (sum, item) => sum + item.total_lines,
-          0
-        ) / metrics.pr_size.length
+      ? metrics.pr_size.reduce((sum, item) => sum + item.total_lines, 0) /
+        metrics.pr_size.length
       : 0;
 
   const avgPickupTime =
     metrics.pickup_time.length > 0
       ? metrics.pickup_time.reduce(
           (sum, item) => sum + item.pickup_time_hours,
-          0
+          0,
         ) / metrics.pickup_time.length
       : 0;
 

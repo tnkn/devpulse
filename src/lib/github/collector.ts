@@ -1,8 +1,24 @@
-import type { CollectionJob } from "@/types";
-import { getCommits, getPullRequests, getReleases, getIssues, getCommitCheckFailed, getPullRequestDetail, getPullRequestReviews } from "./client";
-import { getConnection, checkpoint } from "@/lib/db";
-import { upsertCommits, upsertPullRequests, upsertReleases, upsertIssues, upsertMetadata, updatePRSize, upsertReviews } from "@/lib/db/upsert";
+import { checkpoint, getConnection } from "@/lib/db";
+import {
+  updatePRSize,
+  upsertCommits,
+  upsertIssues,
+  upsertMetadata,
+  upsertPullRequests,
+  upsertReleases,
+  upsertReviews,
+} from "@/lib/db/upsert";
 import { getDecryptedToken } from "@/lib/tokens";
+import type { CollectionJob } from "@/types";
+import {
+  getCommitCheckFailed,
+  getCommits,
+  getIssues,
+  getPullRequestDetail,
+  getPullRequestReviews,
+  getPullRequests,
+  getReleases,
+} from "./client";
 
 const globalJobs = globalThis as unknown as {
   __dev_vis_jobs?: Map<string, CollectionJob>;
@@ -16,7 +32,11 @@ function generateJobId(): string {
   return `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function startCollection(owner: string, repo: string, tokenId?: string): CollectionJob {
+export function startCollection(
+  owner: string,
+  repo: string,
+  tokenId?: string,
+): CollectionJob {
   const id = generateJobId();
   const job: CollectionJob = {
     id,
@@ -47,13 +67,16 @@ export function getJob(id: string): CollectionJob | undefined {
 
 const ENV_TOKEN_ID = "env";
 
-async function resolveJobToken(tokenId?: string | null): Promise<string | undefined> {
+async function resolveJobToken(
+  tokenId?: string | null,
+): Promise<string | undefined> {
   if (!tokenId) return undefined; // will use default resolution in client
 
   // Explicit env var token
   if (tokenId === ENV_TOKEN_ID) {
     const envToken = process.env.GITHUB_TOKEN;
-    if (!envToken) throw new Error("GITHUB_TOKEN environment variable is not set");
+    if (!envToken)
+      throw new Error("GITHUB_TOKEN environment variable is not set");
     return envToken;
   }
 
@@ -105,22 +128,38 @@ async function runCollection(job: CollectionJob): Promise<void> {
     // Get latest timestamps for differential fetch
     job.progress = "Checking existing data...";
     const timestamps = await getLatestTimestamps(repoKey);
-    const isDiff = !!(timestamps.commitSince || timestamps.prSince || timestamps.issueSince);
+    const isDiff = !!(
+      timestamps.commitSince ||
+      timestamps.prSince ||
+      timestamps.issueSince
+    );
 
     if (isDiff) {
-      console.log(`[collector] Differential fetch for ${owner}/${repo} (commits since: ${timestamps.commitSince}, PRs since: ${timestamps.prSince}, issues since: ${timestamps.issueSince})`);
+      console.log(
+        `[collector] Differential fetch for ${owner}/${repo} (commits since: ${timestamps.commitSince}, PRs since: ${timestamps.prSince}, issues since: ${timestamps.issueSince})`,
+      );
     } else {
       console.log(`[collector] Full fetch for ${owner}/${repo}`);
     }
 
     // Collect commits (supports `since`)
     job.progress = "Collecting commits...";
-    const newCommits = await getCommits(owner, repo, timestamps.commitSince ? { since: timestamps.commitSince, token } : { token });
+    const newCommits = await getCommits(
+      owner,
+      repo,
+      timestamps.commitSince
+        ? { since: timestamps.commitSince, token }
+        : { token },
+    );
     console.log(`[collector] Fetched ${newCommits.length} commits`);
 
     // Collect pull requests (uses updated_at cutoff)
     job.progress = "Collecting pull requests...";
-    const newPulls = await getPullRequests(owner, repo, timestamps.prSince ? { since: timestamps.prSince, token } : { token });
+    const newPulls = await getPullRequests(
+      owner,
+      repo,
+      timestamps.prSince ? { since: timestamps.prSince, token } : { token },
+    );
     console.log(`[collector] Fetched ${newPulls.length} pull requests`);
 
     // Collect releases (always full fetch, typically small)
@@ -130,7 +169,13 @@ async function runCollection(job: CollectionJob): Promise<void> {
 
     // Collect issues (supports `since`)
     job.progress = "Collecting issues...";
-    const newIssues = await getIssues(owner, repo, timestamps.issueSince ? { since: timestamps.issueSince, token } : { token });
+    const newIssues = await getIssues(
+      owner,
+      repo,
+      timestamps.issueSince
+        ? { since: timestamps.issueSince, token }
+        : { token },
+    );
     console.log(`[collector] Fetched ${newIssues.length} issues`);
 
     // Upsert into DuckDB
@@ -145,7 +190,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
       // Collect CI status for merged PRs that don't have ci_failed yet
       try {
         const ciReader = await conn.runAndReadAll(
-          "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL"
+          "SELECT number, head_sha FROM pull_requests WHERE merged_at IS NOT NULL AND ci_failed IS NULL",
         );
         const prsNeedingCI = ciReader.getRows();
         if (prsNeedingCI.length > 0) {
@@ -156,16 +201,21 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingCI.length; i += BATCH_SIZE) {
             const batch = prsNeedingCI.slice(i, i + BATCH_SIZE);
             const results = await Promise.all(
-              batch.map((row) => getCommitCheckFailed(owner, repo, String(row[1]), token))
+              batch.map((row) =>
+                getCommitCheckFailed(owner, repo, String(row[1]), token),
+              ),
             );
             batch.forEach((row, idx) => {
-              ciResults.push({ number: Number(row[0]), ci_failed: results[idx] });
+              ciResults.push({
+                number: Number(row[0]),
+                ci_failed: results[idx],
+              });
             });
             job.progress = `Checking CI status (${Math.min(i + BATCH_SIZE, prsNeedingCI.length)}/${prsNeedingCI.length})...`;
           }
 
           const stmt = await conn.prepare(
-            "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2"
+            "UPDATE pull_requests SET ci_failed = $1 WHERE number = $2",
           );
           for (const { number, ci_failed } of ciResults) {
             stmt.bindBoolean(1, ci_failed);
@@ -175,13 +225,15 @@ async function runCollection(job: CollectionJob): Promise<void> {
           stmt.destroySync();
         }
       } catch (ciErr) {
-        console.warn(`[collector] Skipping CI status check: ${ciErr instanceof Error ? ciErr.message : ciErr}`);
+        console.warn(
+          `[collector] Skipping CI status check: ${ciErr instanceof Error ? ciErr.message : ciErr}`,
+        );
       }
 
       // Collect PR size (additions/deletions) for merged PRs that don't have it yet
       try {
         const sizeReader = await conn.runAndReadAll(
-          "SELECT number FROM pull_requests WHERE merged_at IS NOT NULL AND additions IS NULL"
+          "SELECT number FROM pull_requests WHERE merged_at IS NOT NULL AND additions IS NULL",
         );
         const prsNeedingSize = sizeReader.getRows();
         if (prsNeedingSize.length > 0) {
@@ -191,22 +243,31 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingSize.length; i += BATCH_SIZE) {
             const batch = prsNeedingSize.slice(i, i + BATCH_SIZE);
             const results = await Promise.all(
-              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0]), token))
+              batch.map((row) =>
+                getPullRequestDetail(owner, repo, Number(row[0]), token),
+              ),
             );
             for (let j = 0; j < batch.length; j++) {
-              await updatePRSize(conn, Number(batch[j][0]), results[j].additions, results[j].deletions);
+              await updatePRSize(
+                conn,
+                Number(batch[j][0]),
+                results[j].additions,
+                results[j].deletions,
+              );
             }
             job.progress = `Fetching PR sizes (${Math.min(i + BATCH_SIZE, prsNeedingSize.length)}/${prsNeedingSize.length})...`;
           }
         }
       } catch (sizeErr) {
-        console.warn(`[collector] Skipping PR size fetch: ${sizeErr instanceof Error ? sizeErr.message : sizeErr}`);
+        console.warn(
+          `[collector] Skipping PR size fetch: ${sizeErr instanceof Error ? sizeErr.message : sizeErr}`,
+        );
       }
 
       // Backfill user_login for PRs that are missing it
       try {
         const loginReader = await conn.runAndReadAll(
-          "SELECT number FROM pull_requests WHERE user_login IS NULL"
+          "SELECT number FROM pull_requests WHERE user_login IS NULL",
         );
         const prsNeedingLogin = loginReader.getRows();
         if (prsNeedingLogin.length > 0) {
@@ -216,13 +277,15 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingLogin.length; i += BATCH_SIZE) {
             const batch = prsNeedingLogin.slice(i, i + BATCH_SIZE);
             const results = await Promise.all(
-              batch.map((row) => getPullRequestDetail(owner, repo, Number(row[0]), token))
+              batch.map((row) =>
+                getPullRequestDetail(owner, repo, Number(row[0]), token),
+              ),
             );
             for (let j = 0; j < batch.length; j++) {
               const login = results[j].user_login;
               if (login) {
                 const ustmt = await conn.prepare(
-                  "UPDATE pull_requests SET user_login = $1 WHERE number = $2"
+                  "UPDATE pull_requests SET user_login = $1 WHERE number = $2",
                 );
                 ustmt.bindVarchar(1, login);
                 ustmt.bindInteger(2, Number(batch[j][0]));
@@ -234,7 +297,9 @@ async function runCollection(job: CollectionJob): Promise<void> {
           }
         }
       } catch (loginErr) {
-        console.warn(`[collector] Skipping PR author backfill: ${loginErr instanceof Error ? loginErr.message : loginErr}`);
+        console.warn(
+          `[collector] Skipping PR author backfill: ${loginErr instanceof Error ? loginErr.message : loginErr}`,
+        );
       }
 
       // Collect reviews for merged PRs that don't have reviews yet
@@ -242,7 +307,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
         const reviewReader = await conn.runAndReadAll(
           `SELECT DISTINCT p.number FROM pull_requests p
            LEFT JOIN reviews r ON p.number = r.pr_number
-           WHERE p.merged_at IS NOT NULL AND r.id IS NULL`
+           WHERE p.merged_at IS NOT NULL AND r.id IS NULL`,
         );
         const prsNeedingReviews = reviewReader.getRows();
         if (prsNeedingReviews.length > 0) {
@@ -252,7 +317,9 @@ async function runCollection(job: CollectionJob): Promise<void> {
           for (let i = 0; i < prsNeedingReviews.length; i += BATCH_SIZE) {
             const batch = prsNeedingReviews.slice(i, i + BATCH_SIZE);
             const reviewBatches = await Promise.all(
-              batch.map((row) => getPullRequestReviews(owner, repo, Number(row[0]), token))
+              batch.map((row) =>
+                getPullRequestReviews(owner, repo, Number(row[0]), token),
+              ),
             );
             const allReviews = reviewBatches.flat();
             if (allReviews.length > 0) {
@@ -262,11 +329,18 @@ async function runCollection(job: CollectionJob): Promise<void> {
           }
         }
       } catch (reviewErr) {
-        console.warn(`[collector] Skipping reviews fetch: ${reviewErr instanceof Error ? reviewErr.message : reviewErr}`);
+        console.warn(
+          `[collector] Skipping reviews fetch: ${reviewErr instanceof Error ? reviewErr.message : reviewErr}`,
+        );
       }
 
       // Update metadata (with token_id)
-      await upsertMetadata(conn, `${owner}/${repo}`, `https://github.com/${owner}/${repo}`, job.token_id);
+      await upsertMetadata(
+        conn,
+        `${owner}/${repo}`,
+        `https://github.com/${owner}/${repo}`,
+        job.token_id,
+      );
     } finally {
       conn.closeSync();
     }

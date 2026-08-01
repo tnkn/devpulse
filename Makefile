@@ -1,4 +1,4 @@
-.PHONY: help install dev build start docker-build docker-up docker-down clean data-init data-clean
+.PHONY: help install dev build start lint format typecheck docker-build docker-up docker-down clean data-init data-clean
 
 # Default target
 help:
@@ -9,6 +9,11 @@ help:
 	@echo "  make dev          - Start development server"
 	@echo "  make build        - Build for production"
 	@echo "  make start        - Start production server"
+	@echo ""
+	@echo "Quality:"
+	@echo "  make lint         - Check lint and formatting (Biome)"
+	@echo "  make format       - Apply lint fixes and formatting (Biome)"
+	@echo "  make typecheck    - Run the TypeScript compiler"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-build - Build Docker image"
@@ -37,6 +42,16 @@ build:
 
 start:
 	mise exec -- pnpm start
+
+# Quality
+lint:
+	mise exec -- pnpm lint
+
+format:
+	mise exec -- pnpm lint:fix
+
+typecheck:
+	mise exec -- pnpm typecheck
 
 # Docker
 docker-build:
