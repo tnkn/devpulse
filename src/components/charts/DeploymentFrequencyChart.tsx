@@ -1,17 +1,17 @@
 "use client";
 
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
-import type { DeploymentFrequency } from "@/types";
 import { useI18n } from "@/lib/i18n";
 import { formatPeriod } from "@/lib/i18n/format";
+import type { DeploymentFrequency } from "@/types";
 
 interface Props {
   data: DeploymentFrequency[];
@@ -30,9 +30,20 @@ export function DeploymentFrequencyChart({ data }: Props) {
 
   return (
     <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-        <BarChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        minHeight={0}
+      >
+        <BarChart
+          data={data}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid
+            strokeDasharray="3 3"
+            className="stroke-gray-200 dark:stroke-gray-700"
+          />
           <XAxis
             dataKey="period"
             className="text-xs"

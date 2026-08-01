@@ -1,7 +1,7 @@
 "use client";
 
-import type { DORAMetrics } from "@/types";
 import { useI18n } from "@/lib/i18n";
+import type { DORAMetrics } from "@/types";
 
 interface Props {
   metrics: DORAMetrics;
@@ -41,7 +41,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("pr_number,title,lead_time_hours,created_at,merged_at");
     metrics.lead_time_for_changes.forEach((item) => {
       lines.push(
-        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.lead_time_hours},${item.created_at},${item.merged_at}`
+        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.lead_time_hours},${item.created_at},${item.merged_at}`,
       );
     });
     lines.push("");
@@ -51,7 +51,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("period,avg_hours,stddev_hours,plus_sigma,minus_sigma,count");
     metrics.lead_time_stats.forEach((item) => {
       lines.push(
-        `${item.period},${item.avg_hours},${item.stddev_hours},${item.plus_sigma},${item.minus_sigma},${item.count}`
+        `${item.period},${item.avg_hours},${item.stddev_hours},${item.plus_sigma},${item.minus_sigma},${item.count}`,
       );
     });
     lines.push("");
@@ -61,7 +61,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("period,failed_deployments,failure_rate");
     metrics.change_failure_rate.forEach((item) => {
       lines.push(
-        `${item.period},${item.failed_deployments},${item.failure_rate}`
+        `${item.period},${item.failed_deployments},${item.failure_rate}`,
       );
     });
     lines.push("");
@@ -71,7 +71,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("period,total_commits,revert_commits,revert_rate");
     metrics.revert_rate.forEach((item) => {
       lines.push(
-        `${item.period},${item.total_commits},${item.revert_commits},${item.revert_rate}`
+        `${item.period},${item.total_commits},${item.revert_commits},${item.revert_rate}`,
       );
     });
     lines.push("");
@@ -81,7 +81,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("pr_number,title,additions,deletions,total_lines,merged_at");
     metrics.pr_size.forEach((item) => {
       lines.push(
-        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.additions},${item.deletions},${item.total_lines},${item.merged_at}`
+        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.additions},${item.deletions},${item.total_lines},${item.merged_at}`,
       );
     });
     lines.push("");
@@ -91,7 +91,7 @@ export function ExportButtons({ metrics, repoName }: Props) {
     lines.push("pr_number,title,pickup_time_hours,created_at,first_review_at");
     metrics.pickup_time.forEach((item) => {
       lines.push(
-        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.pickup_time_hours},${item.created_at},${item.first_review_at}`
+        `${item.pr_number},"${item.title.replace(/"/g, '""')}",${item.pickup_time_hours},${item.created_at},${item.first_review_at}`,
       );
     });
 
@@ -101,14 +101,18 @@ export function ExportButtons({ metrics, repoName }: Props) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-500 dark:text-gray-400">{t.exportButtons.export}</span>
+      <span className="text-sm text-gray-500 dark:text-gray-400">
+        {t.exportButtons.export}
+      </span>
       <button
+        type="button"
         onClick={handleExportJSON}
         className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
       >
         JSON
       </button>
       <button
+        type="button"
         onClick={handleExportCSV}
         className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
       >

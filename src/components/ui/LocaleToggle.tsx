@@ -7,6 +7,7 @@ export function LocaleToggle() {
 
   return (
     <button
+      type="button"
       onClick={() => setLocale(locale === "en" ? "ja" : "en")}
       className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
     >

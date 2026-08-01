@@ -1,6 +1,6 @@
-import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
-import { promises as fs } from "fs";
-import path from "path";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -20,7 +20,7 @@ async function getEncryptionKey(): Promise<Buffer> {
     cachedKey = Buffer.from(envKey, "hex");
     if (cachedKey.length !== KEY_LENGTH) {
       throw new Error(
-        `ENCRYPTION_KEY must be ${KEY_LENGTH * 2} hex characters (${KEY_LENGTH} bytes)`
+        `ENCRYPTION_KEY must be ${KEY_LENGTH * 2} hex characters (${KEY_LENGTH} bytes)`,
       );
     }
     return cachedKey;
@@ -68,7 +68,7 @@ export async function decrypt(data: EncryptedData): Promise<string> {
   const decipher = createDecipheriv(
     ALGORITHM,
     key,
-    Buffer.from(data.iv, "hex")
+    Buffer.from(data.iv, "hex"),
   );
   decipher.setAuthTag(Buffer.from(data.authTag, "hex"));
   const decrypted = Buffer.concat([

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import type { GitHubTokenMasked, TokenListResponse } from "@/types";
+import { useCallback, useEffect, useState } from "react";
+import { LocaleToggle } from "@/components/ui";
 import { useI18n } from "@/lib/i18n";
 import { formatTimestamp } from "@/lib/i18n/format";
-import { LocaleToggle } from "@/components/ui";
+import type { GitHubTokenMasked, TokenListResponse } from "@/types";
 
 export default function SettingsPage() {
   const { t, locale } = useI18n();
@@ -61,6 +61,7 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold">{t.settings.githubTokens}</h2>
           {allowTokenUI && (
             <button
+              type="button"
               onClick={() => setShowAddModal(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
@@ -212,6 +213,7 @@ function TokenCard({
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={handleTest}
             disabled={testing}
             className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
@@ -220,6 +222,7 @@ function TokenCard({
           </button>
           {allowTokenUI && !token.is_default && (
             <button
+              type="button"
               onClick={handleSetDefault}
               className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
             >
@@ -228,6 +231,7 @@ function TokenCard({
           )}
           {allowTokenUI && (
             <button
+              type="button"
               onClick={handleDelete}
               disabled={deleting}
               className="px-3 py-1 text-sm text-red-600 border border-red-300 dark:border-red-700 rounded hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
@@ -301,12 +305,20 @@ function AddTokenModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-semibold mb-4">{t.settings.addGithubToken}</h3>
+        <h3 className="text-lg font-semibold mb-4">
+          {t.settings.addGithubToken}
+        </h3>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">{t.settings.label}</label>
+            <label
+              htmlFor="token-label"
+              className="block text-sm font-medium mb-1"
+            >
+              {t.settings.label}
+            </label>
             <input
+              id="token-label"
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -317,10 +329,14 @@ function AddTokenModal({
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">
+            <label
+              htmlFor="token-value"
+              className="block text-sm font-medium mb-1"
+            >
               {t.settings.personalAccessToken}
             </label>
             <input
+              id="token-value"
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}

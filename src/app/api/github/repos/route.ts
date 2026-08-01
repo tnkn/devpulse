@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { listRepositories } from "@/lib/github";
 
 export async function GET(request: NextRequest) {
@@ -10,12 +10,21 @@ export async function GET(request: NextRequest) {
   const tokenId = searchParams.get("token_id") || undefined;
 
   try {
-    const result = await listRepositories(page, perPage, query, affiliation, tokenId);
+    const result = await listRepositories(
+      page,
+      perPage,
+      query,
+      affiliation,
+      tokenId,
+    );
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     if (message.includes("GITHUB_TOKEN")) {
-      return NextResponse.json({ error: "GITHUB_TOKEN is not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "GITHUB_TOKEN is not configured" },
+        { status: 500 },
+      );
     }
     return NextResponse.json({ error: message }, { status: 502 });
   }

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import {
-  listTokens,
   addToken,
-  testToken,
   isTokenUIAllowed,
+  listTokens,
+  testToken,
 } from "@/lib/tokens";
 
 export async function GET() {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (!isTokenUIAllowed()) {
     return NextResponse.json(
       { error: "Token management is disabled (ALLOW_TOKEN_UI=false)" },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     if (!label || !token) {
       return NextResponse.json(
         { error: "label and token are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     if (!validation.valid) {
       return NextResponse.json(
         { error: `Invalid token: ${validation.error}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

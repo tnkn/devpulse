@@ -1,19 +1,19 @@
 "use client";
 
 import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
   Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Area,
-  ComposedChart,
 } from "recharts";
-import type { PeriodStats } from "@/types";
 import { useI18n } from "@/lib/i18n";
 import { formatPeriod } from "@/lib/i18n/format";
+import type { PeriodStats } from "@/types";
 
 interface Props {
   data: PeriodStats[];
@@ -42,12 +42,20 @@ export function PickupTimeChart({ data }: Props) {
 
   return (
     <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        minHeight={0}
+      >
         <ComposedChart
           data={chartData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            className="stroke-gray-200 dark:stroke-gray-700"
+          />
           <XAxis
             dataKey="period"
             className="text-xs"

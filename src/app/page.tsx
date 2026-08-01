@@ -1,8 +1,12 @@
 import Link from "next/link";
+import {
+  DeleteButton,
+  LocaleToggle,
+  RepositorySelector,
+} from "@/components/ui";
 import { getRepositories } from "@/lib/data";
-import { getLocale, getMessages } from "@/lib/i18n/server";
 import { formatTimestamp } from "@/lib/i18n/format";
-import { RepositorySelector, DeleteButton, LocaleToggle } from "@/components/ui";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -65,12 +69,16 @@ export default async function HomePage() {
                   <h3 className="font-semibold mb-1">{repo.displayName}</h3>
                   {repo.lastCollected && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {t.common.lastCollected}: {formatTimestamp(repo.lastCollected, locale)}
+                      {t.common.lastCollected}:{" "}
+                      {formatTimestamp(repo.lastCollected, locale)}
                     </p>
                   )}
                 </Link>
                 <div className="ml-3 shrink-0">
-                  <DeleteButton repoKey={repo.name} repoName={repo.displayName} />
+                  <DeleteButton
+                    repoKey={repo.name}
+                    repoName={repo.displayName}
+                  />
                 </div>
               </div>
             ))}

@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import type { GitHubRepository, GitHubTokenMasked, CollectionJob } from "@/types";
+import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import type {
+  CollectionJob,
+  GitHubRepository,
+  GitHubTokenMasked,
+} from "@/types";
 
 interface TokenOption {
   id: string;
@@ -17,30 +21,38 @@ export function RepositorySelector() {
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeJobs, setActiveJobs] = useState<Map<string, CollectionJob>>(new Map());
+  const [activeJobs, setActiveJobs] = useState<Map<string, CollectionJob>>(
+    new Map(),
+  );
   const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
-  const fetchRepositories = useCallback(async (searchQuery?: string, filterOwnOnly?: boolean, tokenId?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (searchQuery) params.set("q", searchQuery);
-      if (filterOwnOnly) params.set("affiliation", "owner,organization_member");
-      if (tokenId) params.set("token_id", tokenId);
-      params.set("per_page", "20");
-      const res = await fetch(`/api/github/repos?${params}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch");
-      setRepositories(data.repositories || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch repositories");
-      setRepositories([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchRepositories = useCallback(
+    async (searchQuery?: string, filterOwnOnly?: boolean, tokenId?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set("q", searchQuery);
+        if (filterOwnOnly)
+          params.set("affiliation", "owner,organization_member");
+        if (tokenId) params.set("token_id", tokenId);
+        params.set("per_page", "20");
+        const res = await fetch(`/api/github/repos?${params}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch");
+        setRepositories(data.repositories || []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch repositories",
+        );
+        setRepositories([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   // Fetch token list when modal opens
   useEffect(() => {
@@ -49,7 +61,8 @@ export function RepositorySelector() {
       .then((res) => res.json())
       .then((data) => {
         const opts: TokenOption[] = [];
-        if (data.hasEnvToken) opts.push({ id: "env", label: "GITHUB_TOKEN (env)" });
+        if (data.hasEnvToken)
+          opts.push({ id: "env", label: "GITHUB_TOKEN (env)" });
         for (const t of data.tokens ?? []) {
           opts.push({
             id: t.id,
@@ -58,16 +71,19 @@ export function RepositorySelector() {
         }
         setTokenOptions(opts);
         // Default to the DB default token
-        const def = (data.tokens ?? []).find((t: GitHubTokenMasked) => t.is_default);
+        const def = (data.tokens ?? []).find(
+          (t: GitHubTokenMasked) => t.is_default,
+        );
         if (def) setSelectedTokenId(def.id);
       })
       .catch(() => {});
   }, [isOpen]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `query` is deliberately excluded; the debounced effect below owns query-driven refetches.
   useEffect(() => {
     if (!isOpen) return;
     fetchRepositories(query || undefined, ownOnly, selectedTokenId);
-  }, [isOpen, ownOnly, selectedTokenId, fetchRepositories]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, ownOnly, selectedTokenId, fetchRepositories]);
 
   // Debounced search
   useEffect(() => {
@@ -111,13 +127,19 @@ export function RepositorySelector() {
       const res = await fetch("/api/github/collect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ owner: repo.owner.login, repo: repo.name, token_id: selectedTokenId }),
+        body: JSON.stringify({
+          owner: repo.owner.login,
+          repo: repo.name,
+          token_id: selectedTokenId,
+        }),
       });
       const job = await res.json();
       if (!res.ok) throw new Error(job.error || "Failed to start collection");
       setActiveJobs((prev) => new Map(prev).set(repoKey, job));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start collection");
+      setError(
+        err instanceof Error ? err.message : "Failed to start collection",
+      );
     }
   };
 
@@ -128,6 +150,7 @@ export function RepositorySelector() {
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
       >
@@ -141,8 +164,11 @@ export function RepositorySelector() {
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold">{t.repoSelector.addRepository}</h2>
+          <h2 className="text-lg font-semibold">
+            {t.repoSelector.addRepository}
+          </h2>
           <button
+            type="button"
             onClick={() => setIsOpen(false)}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xl leading-none"
           >
@@ -197,7 +223,9 @@ export function RepositorySelector() {
         {/* Repository list */}
         <div className="flex-1 overflow-y-auto p-4">
           {loading && repositories.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">{t.common.loading}</div>
+            <div className="text-center text-gray-500 py-8">
+              {t.common.loading}
+            </div>
           ) : repositories.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
               {t.repoSelector.noReposFound}
@@ -235,7 +263,8 @@ function RepoCard({
   onCollect: () => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
-  const isCollecting = job && (job.status === "pending" || job.status === "collecting");
+  const isCollecting =
+    job && (job.status === "pending" || job.status === "collecting");
   const isCompleted = job?.status === "completed";
   const isFailed = job?.status === "failed";
 
@@ -268,8 +297,21 @@ function RepoCard({
         <div className="text-xs text-blue-600 dark:text-blue-400">
           <div className="flex items-center gap-2">
             <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <title>Loading</title>
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
             <span>{job?.progress}</span>
           </div>
@@ -288,10 +330,14 @@ function RepoCard({
         </div>
       ) : isFailed ? (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-red-600 dark:text-red-400" title={job?.error || undefined}>
+          <span
+            className="text-xs text-red-600 dark:text-red-400"
+            title={job?.error || undefined}
+          >
             {t.repoSelector.failed}
           </span>
           <button
+            type="button"
             onClick={onCollect}
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
@@ -300,6 +346,7 @@ function RepoCard({
         </div>
       ) : (
         <button
+          type="button"
           onClick={onCollect}
           className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >

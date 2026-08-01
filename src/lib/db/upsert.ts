@@ -1,11 +1,14 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { Commit, PullRequest, Release, Issue, Review } from "@/types";
+import type { Commit, Issue, PullRequest, Release, Review } from "@/types";
 
-export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): Promise<void> {
+export async function upsertCommits(
+  conn: DuckDBConnection,
+  commits: Commit[],
+): Promise<void> {
   if (commits.length === 0) return;
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO commits (sha, message, author_name, author_email, author_date, committer_name, committer_email, committer_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
   );
   for (const c of commits) {
     stmt.bindVarchar(1, c.sha);
@@ -21,11 +24,14 @@ export async function upsertCommits(conn: DuckDBConnection, commits: Commit[]): 
   stmt.destroySync();
 }
 
-export async function upsertPullRequests(conn: DuckDBConnection, prs: PullRequest[]): Promise<void> {
+export async function upsertPullRequests(
+  conn: DuckDBConnection,
+  prs: PullRequest[],
+): Promise<void> {
   if (prs.length === 0) return;
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO pull_requests (number, title, state, created_at, updated_at, closed_at, merged_at, merge_commit_sha, head_ref, head_sha, base_ref, base_sha, labels_json, ci_failed, additions, deletions, user_login, assignees_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
   );
   for (const pr of prs) {
     stmt.bindInteger(1, pr.number);
@@ -33,29 +39,39 @@ export async function upsertPullRequests(conn: DuckDBConnection, prs: PullReques
     stmt.bindVarchar(3, pr.state);
     stmt.bindVarchar(4, pr.created_at);
     stmt.bindVarchar(5, pr.updated_at);
-    if (pr.closed_at) stmt.bindVarchar(6, pr.closed_at); else stmt.bindNull(6);
-    if (pr.merged_at) stmt.bindVarchar(7, pr.merged_at); else stmt.bindNull(7);
-    if (pr.merge_commit_sha) stmt.bindVarchar(8, pr.merge_commit_sha); else stmt.bindNull(8);
+    if (pr.closed_at) stmt.bindVarchar(6, pr.closed_at);
+    else stmt.bindNull(6);
+    if (pr.merged_at) stmt.bindVarchar(7, pr.merged_at);
+    else stmt.bindNull(7);
+    if (pr.merge_commit_sha) stmt.bindVarchar(8, pr.merge_commit_sha);
+    else stmt.bindNull(8);
     stmt.bindVarchar(9, pr.head.ref);
     stmt.bindVarchar(10, pr.head.sha);
     stmt.bindVarchar(11, pr.base.ref);
     stmt.bindVarchar(12, pr.base.sha);
     stmt.bindVarchar(13, JSON.stringify(pr.labels));
-    if (pr.ci_failed !== undefined) stmt.bindBoolean(14, pr.ci_failed); else stmt.bindNull(14);
-    if (pr.additions !== undefined) stmt.bindInteger(15, pr.additions); else stmt.bindNull(15);
-    if (pr.deletions !== undefined) stmt.bindInteger(16, pr.deletions); else stmt.bindNull(16);
-    if (pr.user_login) stmt.bindVarchar(17, pr.user_login); else stmt.bindNull(17);
+    if (pr.ci_failed !== undefined) stmt.bindBoolean(14, pr.ci_failed);
+    else stmt.bindNull(14);
+    if (pr.additions !== undefined) stmt.bindInteger(15, pr.additions);
+    else stmt.bindNull(15);
+    if (pr.deletions !== undefined) stmt.bindInteger(16, pr.deletions);
+    else stmt.bindNull(16);
+    if (pr.user_login) stmt.bindVarchar(17, pr.user_login);
+    else stmt.bindNull(17);
     stmt.bindVarchar(18, JSON.stringify(pr.assignees ?? []));
     await stmt.run();
   }
   stmt.destroySync();
 }
 
-export async function upsertReleases(conn: DuckDBConnection, releases: Release[]): Promise<void> {
+export async function upsertReleases(
+  conn: DuckDBConnection,
+  releases: Release[],
+): Promise<void> {
   if (releases.length === 0) return;
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO releases (id, tag_name, name, created_at, published_at, prerelease, draft)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
   );
   for (const r of releases) {
     stmt.bindInteger(1, r.id);
@@ -70,11 +86,14 @@ export async function upsertReleases(conn: DuckDBConnection, releases: Release[]
   stmt.destroySync();
 }
 
-export async function upsertIssues(conn: DuckDBConnection, issues: Issue[]): Promise<void> {
+export async function upsertIssues(
+  conn: DuckDBConnection,
+  issues: Issue[],
+): Promise<void> {
   if (issues.length === 0) return;
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
   );
   for (const i of issues) {
     stmt.bindInteger(1, i.number);
@@ -82,18 +101,22 @@ export async function upsertIssues(conn: DuckDBConnection, issues: Issue[]): Pro
     stmt.bindVarchar(3, i.state);
     stmt.bindVarchar(4, i.created_at);
     stmt.bindVarchar(5, i.updated_at);
-    if (i.closed_at) stmt.bindVarchar(6, i.closed_at); else stmt.bindNull(6);
+    if (i.closed_at) stmt.bindVarchar(6, i.closed_at);
+    else stmt.bindNull(6);
     stmt.bindVarchar(7, JSON.stringify(i.labels));
     await stmt.run();
   }
   stmt.destroySync();
 }
 
-export async function upsertReviews(conn: DuckDBConnection, reviews: Review[]): Promise<void> {
+export async function upsertReviews(
+  conn: DuckDBConnection,
+  reviews: Review[],
+): Promise<void> {
   if (reviews.length === 0) return;
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO reviews (id, pr_number, user_login, user_type, state, submitted_at)
-     VALUES ($1, $2, $3, $4, $5, $6)`
+     VALUES ($1, $2, $3, $4, $5, $6)`,
   );
   for (const r of reviews) {
     stmt.bindInteger(1, r.id);
@@ -111,10 +134,10 @@ export async function updatePRSize(
   conn: DuckDBConnection,
   number: number,
   additions: number,
-  deletions: number
+  deletions: number,
 ): Promise<void> {
   const stmt = await conn.prepare(
-    "UPDATE pull_requests SET additions = $1, deletions = $2 WHERE number = $3"
+    "UPDATE pull_requests SET additions = $1, deletions = $2 WHERE number = $3",
   );
   stmt.bindInteger(1, additions);
   stmt.bindInteger(2, deletions);
@@ -144,7 +167,7 @@ export async function upsertMetadata(
 
   const stmt = await conn.prepare(
     `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
   );
   stmt.bindVarchar(1, fullName);
   stmt.bindVarchar(2, repositoryUrl);

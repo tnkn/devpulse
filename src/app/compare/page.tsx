@@ -1,6 +1,6 @@
-import { getRepositories, getRepoData } from "@/lib/data";
-import { calculateDORAMetrics, calculateSummary } from "@/lib/metrics";
+import { getRepoData, getRepositories } from "@/lib/data";
 import { getMessages } from "@/lib/i18n/server";
+import { calculateDORAMetrics, calculateSummary } from "@/lib/metrics";
 import { ComparisonView } from "./ComparisonView";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
       const metrics = calculateDORAMetrics(
         data.pulls,
         data.commits,
-        data.reviews
+        data.reviews,
       );
       const summary = calculateSummary(metrics);
 
@@ -41,7 +41,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
         metrics,
         summary,
       };
-    })
+    }),
   );
 
   const validMetrics = repoMetrics.filter(Boolean) as NonNullable<
@@ -52,9 +52,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
     <main className="min-h-screen p-8">
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{t.compare.title}</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          {t.compare.subtitle}
-        </p>
+        <p className="text-gray-600 dark:text-gray-400">{t.compare.subtitle}</p>
       </header>
 
       <ComparisonView

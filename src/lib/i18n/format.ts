@@ -10,8 +10,8 @@ const localeMap: Record<Locale, string> = {
  */
 function weekToMonday(period: string): Date {
   const [yearStr, weekStr] = period.split("-W");
-  const year = parseInt(yearStr);
-  const week = parseInt(weekStr);
+  const year = parseInt(yearStr, 10);
+  const week = parseInt(weekStr, 10);
   const jan4 = new Date(year, 0, 4);
   const dow = jan4.getDay() || 7;
   const firstMonday = new Date(jan4);
@@ -33,7 +33,10 @@ function pad2(n: number): string {
  * week  → full: "01/13 ~ 01/19" / compact: "01/13~"
  * month → "2025/01"
  */
-export function formatPeriod(period: string, style: "compact" | "full" = "full"): string {
+export function formatPeriod(
+  period: string,
+  style: "compact" | "full" = "full",
+): string {
   // day: YYYY-MM-DD → MM/DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
     const [, m, d] = period.split("-");

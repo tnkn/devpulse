@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Repository, DORAMetrics } from "@/types";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { formatTimestamp } from "@/lib/i18n/format";
+import type { DORAMetrics, Repository } from "@/types";
 
 interface RepoMetrics {
   repoName: string;
@@ -44,7 +44,7 @@ export function ComparisonView({
 
       setSelected(newSelected);
     },
-    [selected]
+    [selected],
   );
 
   const handleCompare = useCallback(() => {
@@ -59,7 +59,9 @@ export function ComparisonView({
     <div>
       {/* Repository Selection */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">{t.compare.selectRepositories}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {t.compare.selectRepositories}
+        </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-4">
           {repositories.map((repo) => (
             <div
@@ -74,7 +76,8 @@ export function ComparisonView({
               <h3 className="font-semibold mb-2">{repo.displayName}</h3>
               {repo.lastCollected && (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t.common.lastCollected}: {formatTimestamp(repo.lastCollected, locale)}
+                  {t.common.lastCollected}:{" "}
+                  {formatTimestamp(repo.lastCollected, locale)}
                 </p>
               )}
             </div>
@@ -82,6 +85,7 @@ export function ComparisonView({
         </div>
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={handleCompare}
             disabled={selected.length < 2}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -97,7 +101,9 @@ export function ComparisonView({
       {/* Comparison Results */}
       {selectedMetrics.length >= 2 && (
         <section>
-          <h2 className="text-xl font-semibold mb-4">{t.compare.comparisonResults}</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            {t.compare.comparisonResults}
+          </h2>
 
           {/* Summary Comparison Table */}
           <div className="overflow-x-auto mb-8">
@@ -114,7 +120,9 @@ export function ComparisonView({
               </thead>
               <tbody>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 font-medium">{t.repo.deploymentFrequency}</td>
+                  <td className="py-3 px-4 font-medium">
+                    {t.repo.deploymentFrequency}
+                  </td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
                       {m.summary.total_deployments} {t.repo.merges}
@@ -122,11 +130,15 @@ export function ComparisonView({
                   ))}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 font-medium">{t.repo.leadTimeForChanges}</td>
+                  <td className="py-3 px-4 font-medium">
+                    {t.repo.leadTimeForChanges}
+                  </td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
                       <span
-                        className={getLeadTimeColor(m.summary.avg_lead_time_hours)}
+                        className={getLeadTimeColor(
+                          m.summary.avg_lead_time_hours,
+                        )}
                       >
                         {m.summary.avg_lead_time_hours} {t.repo.hours}
                       </span>
@@ -134,11 +146,15 @@ export function ComparisonView({
                   ))}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 font-medium">{t.repo.changeFailureRate}</td>
+                  <td className="py-3 px-4 font-medium">
+                    {t.repo.changeFailureRate}
+                  </td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
                       <span
-                        className={getFailureRateColor(m.summary.avg_failure_rate)}
+                        className={getFailureRateColor(
+                          m.summary.avg_failure_rate,
+                        )}
                       >
                         {m.summary.avg_failure_rate}%
                       </span>
@@ -149,7 +165,11 @@ export function ComparisonView({
                   <td className="py-3 px-4 font-medium">{t.repo.revertRate}</td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
-                      <span className={getRevertRateColor(m.summary.avg_revert_rate)}>
+                      <span
+                        className={getRevertRateColor(
+                          m.summary.avg_revert_rate,
+                        )}
+                      >
                         {m.summary.avg_revert_rate}%
                       </span>
                     </td>
@@ -166,10 +186,16 @@ export function ComparisonView({
                   ))}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 font-medium">{t.repo.timeToFirstReview}</td>
+                  <td className="py-3 px-4 font-medium">
+                    {t.repo.timeToFirstReview}
+                  </td>
                   {selectedMetrics.map((m) => (
                     <td key={m.repoName} className="text-right py-3 px-4">
-                      <span className={getPickupTimeColor(m.summary.avg_pickup_time_hours)}>
+                      <span
+                        className={getPickupTimeColor(
+                          m.summary.avg_pickup_time_hours,
+                        )}
+                      >
                         {m.summary.avg_pickup_time_hours} {t.repo.hours}
                       </span>
                     </td>
@@ -190,23 +216,35 @@ export function ComparisonView({
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>{t.compare.deployments}:</span>
-                    <span className="font-medium">{m.summary.total_deployments}</span>
+                    <span className="font-medium">
+                      {m.summary.total_deployments}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t.repo.leadTimeForChanges}:</span>
-                    <span className={getLeadTimeColor(m.summary.avg_lead_time_hours)}>
+                    <span
+                      className={getLeadTimeColor(
+                        m.summary.avg_lead_time_hours,
+                      )}
+                    >
                       {m.summary.avg_lead_time_hours}h
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t.compare.failureRate}:</span>
-                    <span className={getFailureRateColor(m.summary.avg_failure_rate)}>
+                    <span
+                      className={getFailureRateColor(
+                        m.summary.avg_failure_rate,
+                      )}
+                    >
                       {m.summary.avg_failure_rate}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t.repo.revertRate}:</span>
-                    <span className={getRevertRateColor(m.summary.avg_revert_rate)}>
+                    <span
+                      className={getRevertRateColor(m.summary.avg_revert_rate)}
+                    >
                       {m.summary.avg_revert_rate}%
                     </span>
                   </div>
@@ -218,7 +256,11 @@ export function ComparisonView({
                   </div>
                   <div className="flex justify-between">
                     <span>{t.repo.timeToFirstReview}:</span>
-                    <span className={getPickupTimeColor(m.summary.avg_pickup_time_hours)}>
+                    <span
+                      className={getPickupTimeColor(
+                        m.summary.avg_pickup_time_hours,
+                      )}
+                    >
                       {m.summary.avg_pickup_time_hours}h
                     </span>
                   </div>

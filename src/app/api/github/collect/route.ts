@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { startCollection } from "@/lib/github";
 
 export async function POST(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!owner || !repo) {
       return NextResponse.json(
         { error: "owner and repo are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { updateToken, deleteToken, isTokenUIAllowed } from "@/lib/tokens";
+import { deleteToken, isTokenUIAllowed, updateToken } from "@/lib/tokens";
 
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   if (!isTokenUIAllowed()) {
     return NextResponse.json(
       { error: "Token management is disabled (ALLOW_TOKEN_UI=false)" },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
@@ -30,12 +30,12 @@ export async function PUT(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   if (!isTokenUIAllowed()) {
     return NextResponse.json(
       { error: "Token management is disabled (ALLOW_TOKEN_UI=false)" },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
