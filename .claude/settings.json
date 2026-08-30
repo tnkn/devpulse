@@ -1,0 +1,13 @@
+{
+  "enabledPlugins": {
+    "core-planning@claude-dotfiles": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-dotfiles": {
+      "source": {
+        "source": "github",
+        "repo": "tnkn/claude-dotfiles"
+      }
+    }
+  }
+}
