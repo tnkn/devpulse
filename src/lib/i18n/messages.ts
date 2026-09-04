@@ -225,7 +225,11 @@ export type Messages = {
     projectsUnreadable: (reason: string) => string;
     projectsFailed: (reason: string) => string;
     noProjectFields: string;
-    noProjectFieldsFound: (names: string) => string;
+    noProjectFieldsFound: (
+      missingPriority: boolean,
+      missingSize: boolean,
+      names: string,
+    ) => string;
     noAssignableUsers: string;
     filterUsers: string;
     recentlyUsed: string;
@@ -497,8 +501,15 @@ const en: Messages = {
       `Reading Projects failed, so Priority and Size are unavailable. This is not a permissions problem — the request itself did not work, so it is worth reporting. GitHub said: ${reason}`,
     noProjectFields:
       "No project board on this repository has a Priority or Size field.",
-    noProjectFieldsFound: (names) =>
-      `No field looked like Priority or Size. The board has: ${names}. Rename one on GitHub, or tell us which to use.`,
+    noProjectFieldsFound: (missingPriority, missingSize, names) => {
+      const what =
+        missingPriority && missingSize
+          ? "Priority or Size"
+          : missingPriority
+            ? "Priority"
+            : "Size";
+      return `No field looked like ${what}. The board has: ${names}. Rename one on GitHub, or tell us which to use.`;
+    },
     noAssignableUsers:
       "No assignable users. The token needs read access to the repository's collaborators.",
     filterUsers: "Filter users",
@@ -812,8 +823,15 @@ const ja: Messages = {
       `Projects \u306E\u53D6\u5F97\u306B\u5931\u6557\u3057\u305F\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8868\u793A\u3067\u304D\u307E\u305B\u3093\u3002\u3053\u308C\u306F\u6A29\u9650\u306E\u554F\u984C\u3067\u306F\u306A\u304F\u3001\u30EA\u30AF\u30A8\u30B9\u30C8\u81EA\u4F53\u304C\u5931\u6557\u3057\u3066\u3044\u307E\u3059\u3002\u5831\u544A\u3057\u3066\u304F\u3060\u3055\u3044\u3002GitHub \u306E\u5FDC\u7B54: ${reason}`,
     noProjectFields:
       "\u3053\u306E\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
-    noProjectFieldsFound: (names) =>
-      `\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3089\u3057\u304D\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u30DC\u30FC\u30C9\u306E\u30D5\u30A3\u30FC\u30EB\u30C9: ${names}\u3002GitHub \u3067\u30D5\u30A3\u30FC\u30EB\u30C9\u540D\u3092\u5909\u66F4\u3059\u308B\u304B\u3001\u3069\u308C\u3092\u4F7F\u3046\u304B\u304A\u77E5\u3089\u305B\u304F\u3060\u3055\u3044\u3002`,
+    noProjectFieldsFound: (missingPriority, missingSize, names) => {
+      const what =
+        missingPriority && missingSize
+          ? "\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA"
+          : missingPriority
+            ? "\u512A\u5148\u5EA6"
+            : "\u30B5\u30A4\u30BA";
+      return `${what}\u3089\u3057\u304D\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u30DC\u30FC\u30C9\u306E\u30D5\u30A3\u30FC\u30EB\u30C9: ${names}\u3002GitHub \u3067\u30D5\u30A3\u30FC\u30EB\u30C9\u540D\u3092\u5909\u66F4\u3059\u308B\u304B\u3001\u3069\u308C\u3092\u4F7F\u3046\u304B\u304A\u77E5\u3089\u305B\u304F\u3060\u3055\u3044\u3002`;
+    },
     noAssignableUsers:
       "\u5272\u308A\u5F53\u3066\u53EF\u80FD\u306A\u30E6\u30FC\u30B6\u30FC\u304C\u3044\u307E\u305B\u3093\u3002\u30C8\u30FC\u30AF\u30F3\u306B\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30B3\u30E9\u30DC\u30EC\u30FC\u30BF\u30FC\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059\u3002",
     filterUsers: "\u30E6\u30FC\u30B6\u30FC\u3092\u7D5E\u308A\u8FBC\u307F",
