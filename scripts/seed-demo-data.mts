@@ -25,6 +25,7 @@ import {
 } from "../src/lib/db/schema.ts";
 import {
   replaceIssueRelations,
+  replaceProjectFields,
   upsertIssues,
   upsertMetadata,
 } from "../src/lib/db/upsert.ts";
@@ -79,6 +80,48 @@ const SEED_PROJECT_FIELDS: Record<
   302: { priority: "P3", size: "S" },
   401: { priority: "Someday" },
 };
+
+/**
+ * Stand-ins for the Projects v2 board the demo issues sit on.
+ *
+ * The ids are what an edit addresses, so seeding them is what makes the
+ * editable cells reachable without a real board. They are obvious fakes:
+ * an edit against them fails at GitHub, which is the honest outcome for
+ * a repository that does not exist.
+ */
+const DEMO_PROJECT_ID = "PVT_demo_checkout_revamp";
+
+const DEMO_PROJECT_FIELDS = [
+  {
+    projectId: DEMO_PROJECT_ID,
+    projectTitle: "Checkout revamp",
+    fieldId: "PVTSSF_demo_priority",
+    fieldName: "Priority",
+    kind: "priority" as const,
+    dataType: "SINGLE_SELECT",
+    options: [
+      { id: "opt_p0", name: "P0" },
+      { id: "opt_p1", name: "P1" },
+      { id: "opt_p2", name: "P2" },
+      { id: "opt_p3", name: "P3" },
+    ],
+  },
+  {
+    projectId: DEMO_PROJECT_ID,
+    projectTitle: "Checkout revamp",
+    fieldId: "PVTSSF_demo_size",
+    fieldName: "Size",
+    kind: "size" as const,
+    dataType: "SINGLE_SELECT",
+    options: [
+      { id: "opt_xs", name: "XS" },
+      { id: "opt_s", name: "S" },
+      { id: "opt_m", name: "M" },
+      { id: "opt_l", name: "L" },
+      { id: "opt_xl", name: "XL" },
+    ],
+  },
+];
 
 /** Cluster A: checkout revamp. Cluster B: payments. Cluster C: infra. */
 const SEED_ISSUES: SeedIssue[] = [
@@ -343,9 +386,15 @@ async function main(): Promise<void> {
       assignees: seed.assignees ?? [],
       priority: SEED_PROJECT_FIELDS[seed.number]?.priority ?? null,
       size: SEED_PROJECT_FIELDS[seed.number]?.size ?? null,
+      // #402 is deliberately left off the board, so the read-only case
+      // for the Priority and Size cells is visible in the demo too.
+      project_id: seed.number === 402 ? null : DEMO_PROJECT_ID,
+      project_item_id: seed.number === 402 ? null : `PVTI_demo_${seed.number}`,
       ...timestampsFor(index, seed.state),
     }));
     await upsertIssues(conn, issues);
+
+    await replaceProjectFields(conn, DEMO_PROJECT_FIELDS);
 
     await replaceIssueRelations(
       conn,

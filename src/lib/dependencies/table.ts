@@ -17,6 +17,12 @@ export interface DependencyRow {
   labels: string[];
   priority: string | null;
   size: string | null;
+  /**
+   * The board item Priority and Size are edited through. Null when the
+   * issue is on no board, which is what makes those cells read-only.
+   */
+  projectId: string | null;
+  projectItemId: string | null;
   /** The sub-issue parent, when this issue has one and it is visible. */
   parent: { number: number; title: string } | null;
   /** Issues that must finish first, ascending. */
@@ -101,6 +107,8 @@ export function buildDependencyRows(
       labels: issue?.labels.map((l) => l.name) ?? [],
       priority: issue?.priority ?? null,
       size: issue?.size ?? null,
+      projectId: issue?.project_id ?? null,
+      projectItemId: issue?.project_item_id ?? null,
       parent:
         parentNumber === undefined
           ? null

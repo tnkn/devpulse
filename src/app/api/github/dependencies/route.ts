@@ -6,72 +6,17 @@ import {
   listIssueDependencies,
   uncacheIssueDependency,
 } from "@/lib/db/upsert";
+import { addIssueBlockedBy, removeIssueBlockedBy } from "@/lib/github/client";
 import {
-  addIssueBlockedBy,
-  GitHubApiError,
-  removeIssueBlockedBy,
-} from "@/lib/github/client";
-import { getDecryptedToken } from "@/lib/tokens";
+  resolveRepo,
+  resolveRepoToken,
+  toErrorResponse,
+} from "@/lib/github/repo-context";
 
 /**
  * GitHub owns issue dependencies, so writes go there first and the local
  * table is only updated once GitHub has accepted the change.
  */
-async function resolveRepo(
-  repoKey: string,
-): Promise<{ owner: string; repo: string; tokenId: string | null }> {
-  const conn = await getConnection(repoKey);
-  try {
-    const reader = await conn.runAndReadAll(
-      "SELECT full_name, token_id FROM metadata LIMIT 1",
-    );
-    const rows = reader.getRows();
-    const fullName = rows[0]?.[0] != null ? String(rows[0][0]) : null;
-    if (!fullName) {
-      throw new Error("Repository metadata not found. Collect it first.");
-    }
-    const [owner, repo] = fullName.split("/");
-    return {
-      owner,
-      repo,
-      tokenId: rows[0]?.[1] != null ? String(rows[0][1]) : null,
-    };
-  } finally {
-    conn.closeSync();
-  }
-}
-
-async function resolveToken(
-  tokenId: string | null,
-): Promise<string | undefined> {
-  if (!tokenId) return undefined;
-  if (tokenId === "env") return process.env.GITHUB_TOKEN;
-  try {
-    return (await getDecryptedToken(tokenId)) || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Turns a GitHub failure into a message the UI can act on. */
-function toResponse(err: unknown): NextResponse {
-  if (err instanceof GitHubApiError) {
-    const code =
-      err.status === 403 || err.status === 401
-        ? "forbidden"
-        : err.status === 422
-          ? "rejected"
-          : err.status === 404
-            ? "not_found"
-            : "github_error";
-    return NextResponse.json(
-      { error: err.message, code },
-      { status: err.status === 401 ? 403 : err.status },
-    );
-  }
-  const message = err instanceof Error ? err.message : "Unknown error";
-  return NextResponse.json({ error: message }, { status: 500 });
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +33,7 @@ export async function GET(request: NextRequest) {
       conn.closeSync();
     }
   } catch (err) {
-    return toResponse(err);
+    return toErrorResponse(err);
   }
 }
 
@@ -115,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { owner, repo, tokenId } = await resolveRepo(repoKey);
-    const token = await resolveToken(tokenId);
+    const token = await resolveRepoToken(tokenId);
 
     const conn = await getConnection(repoKey);
     try {
@@ -139,7 +84,7 @@ export async function POST(request: NextRequest) {
       conn.closeSync();
     }
   } catch (err) {
-    return toResponse(err);
+    return toErrorResponse(err);
   }
 }
 
@@ -165,7 +110,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { owner, repo, tokenId } = await resolveRepo(repoKey);
-    const token = await resolveToken(tokenId);
+    const token = await resolveRepoToken(tokenId);
 
     const conn = await getConnection(repoKey);
     try {
@@ -188,6 +133,6 @@ export async function DELETE(request: NextRequest) {
       conn.closeSync();
     }
   } catch (err) {
-    return toResponse(err);
+    return toErrorResponse(err);
   }
 }

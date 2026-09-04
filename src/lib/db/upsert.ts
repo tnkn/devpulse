@@ -5,6 +5,7 @@ import type {
   IssueDependencyEdge,
   IssueProjectFields,
   IssueSubIssueEdge,
+  ProjectFieldDefinition,
   PullRequest,
   Release,
   Review,
@@ -104,8 +105,8 @@ export async function upsertIssues(
     // Project fields are listed here, not written by a later UPDATE:
     // INSERT OR REPLACE rewrites the whole row, so a column left out
     // would be blanked every time an issue is re-collected.
-    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id, priority, size)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id, priority, size, project_id, project_item_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
   );
   for (const i of issues) {
     stmt.bindInteger(1, i.number);
@@ -123,6 +124,10 @@ export async function upsertIssues(
     else stmt.bindNull(10);
     if (i.size) stmt.bindVarchar(11, i.size);
     else stmt.bindNull(11);
+    if (i.project_id) stmt.bindVarchar(12, i.project_id);
+    else stmt.bindNull(12);
+    if (i.project_item_id) stmt.bindVarchar(13, i.project_item_id);
+    else stmt.bindNull(13);
     await stmt.run();
   }
   stmt.destroySync();
@@ -144,15 +149,121 @@ export async function getStoredProjectFields(
 
   const scope = issueNumbers.join(",");
   const reader = await conn.runAndReadAll(
-    `SELECT number, priority, size FROM issues WHERE number IN (${scope})`,
+    `SELECT number, priority, size, project_id, project_item_id FROM issues WHERE number IN (${scope})`,
   );
   for (const row of reader.getRows()) {
     fields.set(Number(row[0]), {
       priority: row[1] == null ? null : String(row[1]),
       size: row[2] == null ? null : String(row[2]),
+      projectId: row[3] == null ? null : String(row[3]),
+      projectItemId: row[4] == null ? null : String(row[4]),
     });
   }
   return fields;
+}
+
+/** Replaces the cached board field definitions for this repository. */
+export async function replaceProjectFields(
+  conn: DuckDBConnection,
+  definitions: ProjectFieldDefinition[],
+): Promise<void> {
+  await conn.run("DELETE FROM project_fields");
+  if (definitions.length === 0) return;
+
+  const stmt = await conn.prepare(
+    `INSERT OR REPLACE INTO project_fields (project_id, field_id, project_title, field_name, kind, data_type, options_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+  );
+  for (const d of definitions) {
+    stmt.bindVarchar(1, d.projectId);
+    stmt.bindVarchar(2, d.fieldId);
+    stmt.bindVarchar(3, d.projectTitle);
+    stmt.bindVarchar(4, d.fieldName);
+    stmt.bindVarchar(5, d.kind);
+    stmt.bindVarchar(6, d.dataType);
+    stmt.bindVarchar(7, JSON.stringify(d.options));
+    await stmt.run();
+  }
+  stmt.destroySync();
+}
+
+/** The cached board field definitions, for rendering and for writes. */
+export async function listProjectFields(
+  conn: DuckDBConnection,
+): Promise<ProjectFieldDefinition[]> {
+  const reader = await conn.runAndReadAll(
+    "SELECT project_id, field_id, project_title, field_name, kind, data_type, options_json FROM project_fields ORDER BY project_id, kind",
+  );
+  return reader.getRows().map((row) => ({
+    projectId: String(row[0]),
+    fieldId: String(row[1]),
+    projectTitle: row[2] == null ? "" : String(row[2]),
+    fieldName: String(row[3]),
+    kind: String(row[4]) as ProjectFieldDefinition["kind"],
+    dataType: String(row[5]),
+    options: row[6] == null ? [] : JSON.parse(String(row[6])),
+  }));
+}
+
+/**
+ * Writes an accepted edit into the local row.
+ *
+ * An UPDATE rather than the usual upsert: only the edited column may
+ * move, and the issue's other columns are not ours to restate here.
+ * Called only after GitHub has taken the change.
+ */
+export async function setIssueFieldsLocally(
+  conn: DuckDBConnection,
+  issueNumber: number,
+  fields: {
+    priority?: string | null;
+    size?: string | null;
+    assignees?: string[];
+  },
+): Promise<void> {
+  const assignments: string[] = [];
+  const values: (string | null)[] = [];
+
+  if ("priority" in fields) {
+    assignments.push(`priority = $${assignments.length + 2}`);
+    values.push(fields.priority ?? null);
+  }
+  if ("size" in fields) {
+    assignments.push(`size = $${assignments.length + 2}`);
+    values.push(fields.size ?? null);
+  }
+  if ("assignees" in fields) {
+    assignments.push(`assignees_json = $${assignments.length + 2}`);
+    values.push(JSON.stringify(fields.assignees ?? []));
+  }
+  if (assignments.length === 0) return;
+
+  const stmt = await conn.prepare(
+    `UPDATE issues SET ${assignments.join(", ")} WHERE number = $1`,
+  );
+  stmt.bindInteger(1, issueNumber);
+  values.forEach((value, index) => {
+    if (value === null) stmt.bindNull(index + 2);
+    else stmt.bindVarchar(index + 2, value);
+  });
+  await stmt.run();
+  stmt.destroySync();
+}
+
+/** The board item one issue's project fields are edited through. */
+export async function getIssueProjectItem(
+  conn: DuckDBConnection,
+  issueNumber: number,
+): Promise<{ projectId: string; projectItemId: string } | null> {
+  const stmt = await conn.prepare(
+    "SELECT project_id, project_item_id FROM issues WHERE number = $1",
+  );
+  stmt.bindInteger(1, issueNumber);
+  const reader = await stmt.runAndReadAll();
+  stmt.destroySync();
+  const row = reader.getRows()[0];
+  if (!row || row[0] == null || row[1] == null) return null;
+  return { projectId: String(row[0]), projectItemId: String(row[1]) };
 }
 
 /** When project fields were last fetched for every issue, or null. */

@@ -12,7 +12,12 @@ import {
 } from "@/lib/dependencies/graph";
 import type { LayoutDirection } from "@/lib/dependencies/layout";
 import { useI18n } from "@/lib/i18n";
-import type { Issue, IssueDependencyEdge, IssueSubIssueEdge } from "@/types";
+import type {
+  Issue,
+  IssueDependencyEdge,
+  IssueSubIssueEdge,
+  ProjectFieldDefinition,
+} from "@/types";
 
 // Client-only: React Flow resolves `colorMode="system"` from matchMedia,
 // which does not match the server-rendered markup in dark mode.
@@ -35,6 +40,7 @@ interface Props {
   issues: Issue[];
   initialEdges: IssueDependencyEdge[];
   subIssues: IssueSubIssueEdge[];
+  projectFields: ProjectFieldDefinition[];
 }
 
 type ViewMode = "graph" | "table";
@@ -48,6 +54,7 @@ export function DependencyGraph({
   issues,
   initialEdges,
   subIssues,
+  projectFields,
 }: Props) {
   const { t } = useI18n();
   const [edges, setEdges] = useState<IssueDependencyEdge[]>(initialEdges);
@@ -455,6 +462,8 @@ export function DependencyGraph({
         <div className="min-h-0 flex-1">
           {view === "table" ? (
             <DependencyTable
+              repoKey={repoKey}
+              projectFields={projectFields}
               issues={issues}
               edges={edges}
               subIssues={subIssues}

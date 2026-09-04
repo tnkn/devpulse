@@ -68,12 +68,39 @@ export interface Issue {
    */
   priority?: string | null;
   size?: string | null;
+  /** The board item Priority and Size are edited through, if any. */
+  project_id?: string | null;
+  project_item_id?: string | null;
 }
 
 /** The two project fields the graph shows, keyed off an issue. */
 export interface IssueProjectFields {
   priority: string | null;
   size: string | null;
+  /**
+   * The board item the values were read from, which is also the one an
+   * edit writes back to. Null when the issue is on no board — nothing
+   * to edit, because the field only exists as part of an item.
+   */
+  projectId: string | null;
+  projectItemId: string | null;
+}
+
+/**
+ * One editable Priority or Size field on one board, with everything a
+ * write needs: the ids to address it and the options it will accept.
+ */
+export interface ProjectFieldDefinition {
+  projectId: string;
+  projectTitle: string;
+  fieldId: string;
+  fieldName: string;
+  /** Which of the two the field name was recognised as. */
+  kind: "priority" | "size";
+  /** GitHub's ProjectV2FieldType: SINGLE_SELECT, NUMBER, TEXT, ... */
+  dataType: string;
+  /** Empty unless the field is a single select. */
+  options: { id: string; name: string }[];
 }
 
 /** Minimal identity of an issue returned by the relationship endpoints. */

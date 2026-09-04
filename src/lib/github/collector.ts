@@ -6,6 +6,7 @@ import {
   getIssuesProjectFieldsSyncedAt,
   getStoredProjectFields,
   replaceIssueRelations,
+  replaceProjectFields,
   updatePRSize,
   upsertCommits,
   upsertIssues,
@@ -34,7 +35,11 @@ import {
   getSubIssues,
   resolveToken,
 } from "./client";
-import { fetchIssueProjectFields, ProjectsUnavailableError } from "./projects";
+import {
+  fetchIssueProjectFields,
+  fetchProjectFieldDefs,
+  ProjectsUnavailableError,
+} from "./projects";
 
 const globalJobs = globalThis as unknown as {
   __dev_vis_jobs?: Map<string, CollectionJob>;
@@ -163,11 +168,14 @@ async function attachProjectFields(
 
   let fetched: Map<number, IssueProjectFields>;
   try {
-    fetched = await fetchIssueProjectFields(
-      owner,
-      repo,
-      await resolveToken(token),
-      since,
+    const bearer = await resolveToken(token);
+    fetched = await fetchIssueProjectFields(owner, repo, bearer, since);
+    // Cached alongside the values because an issue with no Priority set
+    // carries no value to learn the field's id from, and an unset field
+    // is exactly the one an editor needs to offer options for.
+    await replaceProjectFields(
+      conn,
+      await fetchProjectFieldDefs(owner, repo, bearer),
     );
   } catch (err) {
     if (err instanceof ProjectsUnavailableError) {
@@ -187,6 +195,8 @@ async function attachProjectFields(
       const existing = stored.get(issue.number);
       issue.priority = existing?.priority ?? null;
       issue.size = existing?.size ?? null;
+      issue.project_id = existing?.projectId ?? null;
+      issue.project_item_id = existing?.projectItemId ?? null;
     }
     return false;
   }
@@ -198,6 +208,8 @@ async function attachProjectFields(
     const fields = fetched.get(issue.number);
     issue.priority = fields?.priority ?? null;
     issue.size = fields?.size ?? null;
+    issue.project_id = fields?.projectId ?? null;
+    issue.project_item_id = fields?.projectItemId ?? null;
   }
   console.log(
     `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
