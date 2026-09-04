@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DependencyTable } from "@/components/dependency-graph/DependencyTable";
 import {
   buildDependencyGraph,
@@ -37,7 +37,6 @@ interface Props {
   subIssues: IssueSubIssueEdge[];
 }
 
-type StartMode = "all" | "issue" | "label";
 type ViewMode = "graph" | "table";
 
 /** 0 stands for "no limit". */
@@ -52,9 +51,9 @@ export function DependencyGraph({
 }: Props) {
   const { t } = useI18n();
   const [edges, setEdges] = useState<IssueDependencyEdge[]>(initialEdges);
-  const [startMode, setStartMode] = useState<StartMode>("all");
   const [selectedIssues, setSelectedIssues] = useState<number[]>([]);
   const [issueQuery, setIssueQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(DEFAULT_DISPLAY_LIMIT);
   const [direction, setDirection] = useState<LayoutDirection>("TB");
   const [view, setView] = useState<ViewMode>("graph");
@@ -64,6 +63,36 @@ export function DependencyGraph({
   // Kept here rather than in the canvas: switching the start point can
   // empty the graph, unmounting the canvas and with it any state it owns.
   const [positions, setPositions] = useState<NodePositionOverrides>({});
+
+  // Edges are held locally so a write can update the graph without a round
+  // trip to the server, which leaves them stale when the server re-renders
+  // with fresh ones — after a collection run, say. Server truth wins.
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges]);
+
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Closed by a press outside it rather than by blur: clicking a checkbox
+  // inside the list blurs the search input, which would shut the list on
+  // the first pick.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!pickerRef.current?.contains(e.target as Node)) setPickerOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPickerOpen(false);
+    };
+    // Capture phase: the graph canvas stops mousedown from bubbling, so a
+    // press on it would otherwise never reach a listener on the document.
+    document.addEventListener("mousedown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pickerOpen]);
 
   const handleNodeMoved = useCallback(
     (nodeId: string, position: { x: number; y: number }) => {
@@ -125,18 +154,20 @@ export function DependencyGraph({
     return [...set].sort();
   }, [issues]);
 
-  // `null` means "no start point selected", which shows the whole graph.
-  // An empty array means a filter is active but nothing is picked yet.
+  // Both filters are always live and combine as a union: an issue picked
+  // here, plus everything carrying the chosen label. `null` means neither
+  // is set, which shows the whole graph — there is no mode to be in.
   const roots = useMemo<number[] | null>(() => {
-    if (startMode === "issue") return selectedIssues;
-    if (startMode === "label") {
-      if (!selectedLabel) return [];
-      return issues
-        .filter((i) => i.labels.some((l) => l.name === selectedLabel))
-        .map((i) => i.number);
+    const chosen = new Set(selectedIssues);
+    if (selectedLabel) {
+      for (const issue of issues) {
+        if (issue.labels.some((l) => l.name === selectedLabel)) {
+          chosen.add(issue.number);
+        }
+      }
     }
-    return null;
-  }, [startMode, selectedIssues, selectedLabel, issues]);
+    return chosen.size === 0 ? null : [...chosen];
+  }, [selectedIssues, selectedLabel, issues]);
 
   const allNumbers = useMemo(() => issues.map((i) => i.number), [issues]);
 
@@ -167,10 +198,7 @@ export function DependencyGraph({
     [issues, edges, visibleNumbers, repoFullName, subIssues],
   );
 
-  const emptyMessage =
-    roots !== null && roots.length === 0
-      ? t.dependencies.selectStartPointHint
-      : t.dependencies.noEdges;
+  const emptyMessage = t.dependencies.noEdges;
 
   const addDependency = useCallback(
     async (blockerNumber: number, blockedNumber: number): Promise<boolean> => {
@@ -262,63 +290,62 @@ export function DependencyGraph({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <span className="font-semibold">{t.dependencies.startPoint}</span>
+
         <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="start-mode"
-            checked={startMode === "all"}
-            onChange={() => setStartMode("all")}
-          />
-          {t.dependencies.all}
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="start-mode"
-            checked={startMode === "issue"}
-            onChange={() => setStartMode("issue")}
-          />
-          {t.dependencies.byIssue}
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="start-mode"
-            checked={startMode === "label"}
-            onChange={() => setStartMode("label")}
-          />
-          {t.dependencies.byLabel}
+          <span className="text-gray-500 dark:text-gray-400">
+            {t.dependencies.filterByLabel}
+          </span>
+          <select
+            value={selectedLabel}
+            onChange={(e) => setSelectedLabel(e.target.value)}
+            className="max-w-[14rem] px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+          >
+            <option value="">{t.dependencies.selectLabel}</option>
+            {allLabels.map((label) => (
+              <option key={label} value={label}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
 
-        {startMode === "issue" && (
-          // Checkboxes rather than a multi-select: a selection made before
-          // typing must survive the search hiding that row, which a
-          // <select multiple> cannot do (it only reports rendered options).
-          <div className="flex w-full max-w-md flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="search"
-                value={issueQuery}
-                onChange={(e) => setIssueQuery(e.target.value)}
-                placeholder={t.dependencies.filterIssues}
-                className="min-w-0 flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-              />
-              {selectedIssues.length > 0 && (
-                <>
-                  <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                    {t.dependencies.selectedCount(selectedIssues.length)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIssues([])}
-                    className="shrink-0 text-xs text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    {t.dependencies.clearSelection}
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="h-24 overflow-y-auto rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-600 dark:bg-gray-800">
+        {/* The list drops over the canvas rather than sitting above it:
+            always-on it would cost the graph a hundred pixels of height. */}
+        <div ref={pickerRef} className="relative flex items-center gap-2">
+          <span className="text-gray-500 dark:text-gray-400">
+            {t.dependencies.filterByIssue}
+          </span>
+          <input
+            type="search"
+            value={issueQuery}
+            onChange={(e) => {
+              setIssueQuery(e.target.value);
+              setPickerOpen(true);
+            }}
+            onFocus={() => setPickerOpen(true)}
+            placeholder={t.dependencies.filterIssues}
+            className="w-56 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+          />
+          {selectedIssues.length > 0 && (
+            <>
+              <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                {t.dependencies.selectedCount(selectedIssues.length)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedIssues([])}
+                className="shrink-0 text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {t.dependencies.clearSelection}
+              </button>
+            </>
+          )}
+          {pickerOpen && (
+            // Checkboxes rather than a multi-select: a selection made
+            // before typing must survive the search hiding that row,
+            // which a <select multiple> cannot do (it only reports the
+            // options it has rendered).
+            <div className="absolute top-full left-0 z-20 mt-1 max-h-64 w-96 overflow-y-auto rounded border border-gray-300 bg-white px-2 py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
               {matchingIssues.length === 0 ? (
                 <p className="py-1 text-xs text-gray-500 dark:text-gray-400">
                   {t.dependencies.noMatchingIssues}
@@ -341,23 +368,8 @@ export function DependencyGraph({
                 ))
               )}
             </div>
-          </div>
-        )}
-
-        {startMode === "label" && (
-          <select
-            value={selectedLabel}
-            onChange={(e) => setSelectedLabel(e.target.value)}
-            className="max-w-xs px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-          >
-            <option value="">{t.dependencies.selectLabel}</option>
-            {allLabels.map((label) => (
-              <option key={label} value={label}>
-                {label}
-              </option>
-            ))}
-          </select>
-        )}
+          )}
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-gray-500 dark:text-gray-400">

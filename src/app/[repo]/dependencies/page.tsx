@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DependencyGraph } from "@/components/DependencyGraph";
-import { LocaleToggle } from "@/components/ui";
+import { LocaleToggle, UpdateButton } from "@/components/ui";
 import { getIssueRelations, getRepoData } from "@/lib/data";
 import { getMessages } from "@/lib/i18n/server";
 
@@ -47,7 +47,16 @@ export default async function DependencyGraphPage({ params }: PageProps) {
         </nav>
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">{t.dependencies.title}</h1>
-          <LocaleToggle />
+          <div className="flex items-center gap-2">
+            {/* Re-collecting is what refreshes the relationships this page
+                draws, so it belongs here and not only on the repo page. */}
+            <UpdateButton
+              owner={data.metadata.repository.split("/")[0]}
+              repo={data.metadata.repository.split("/")[1]}
+              tokenId={data.metadata.token_id}
+            />
+            <LocaleToggle />
+          </div>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           {t.dependencies.description}

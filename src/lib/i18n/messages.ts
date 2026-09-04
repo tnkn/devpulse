@@ -203,13 +203,12 @@ export type Messages = {
     title: string;
     description: string;
     startPoint: string;
-    all: string;
-    byIssue: string;
+    filterByIssue: string;
+    filterByLabel: string;
     filterIssues: string;
     selectedCount: (count: number) => string;
     clearSelection: string;
     noMatchingIssues: string;
-    byLabel: string;
     displayLimit: string;
     layout: string;
     view: string;
@@ -235,7 +234,6 @@ export type Messages = {
     completed: string;
     start: string;
     finish: string;
-    selectStartPointHint: string;
     dependencyEdge: string;
     subIssueGroup: string;
     blockingNow: string;
@@ -458,13 +456,12 @@ const en: Messages = {
     description:
       "Visualize GitHub issue dependencies and sub-issue hierarchy. GitHub is the source of truth: adding or removing a dependency here writes it to GitHub, and the Update button re-syncs from it.",
     startPoint: "Start point",
-    all: "All",
-    byIssue: "By issue",
+    filterByIssue: "Issue",
+    filterByLabel: "Label / tag",
     filterIssues: "Filter by number or title",
     selectedCount: (count) => `${count} selected`,
     clearSelection: "Clear",
     noMatchingIssues: "No matching issues",
-    byLabel: "By label / tag",
     displayLimit: "Display limit",
     layout: "Layout",
     view: "View",
@@ -491,7 +488,6 @@ const en: Messages = {
     completed: "Done",
     start: "Start",
     finish: "Finish",
-    selectStartPointHint: "Pick a start point to display its dependency graph.",
     dependencyEdge: "Blocked by",
     subIssueGroup: "Parent issue (contains sub-issues)",
     blockingNow: "Still blocking",
@@ -751,15 +747,14 @@ const ja: Messages = {
     description:
       "GitHub \u306E Issue \u4F9D\u5B58\u95A2\u4FC2 (blocked by) \u3068\u89AA\u5B50\u95A2\u4FC2 (sub-issue) \u3092\u53EF\u8996\u5316\u3057\u307E\u3059\u3002GitHub \u304C\u6B63\u3068\u306A\u308A\u3001\u3053\u3053\u3067\u306E\u8FFD\u52A0\u30FB\u524A\u9664\u306F GitHub \u306B\u53CD\u6620\u3055\u308C\u3001\u300C\u66F4\u65B0\u300D\u30DC\u30BF\u30F3\u3067\u518D\u540C\u671F\u3055\u308C\u307E\u3059\u3002",
     startPoint: "\u8D77\u70B9",
-    all: "\u3059\u3079\u3066",
-    byIssue: "Issue \u3067\u7D5E\u308A\u8FBC\u307F",
+    filterByIssue: "Issue",
+    filterByLabel: "\u30E9\u30D9\u30EB / \u30BF\u30B0",
     filterIssues:
       "\u756A\u53F7\u30FB\u30BF\u30A4\u30C8\u30EB\u3067\u691C\u7D22",
     selectedCount: (count) => `${count} \u4EF6\u9078\u629E\u4E2D`,
     clearSelection: "\u30AF\u30EA\u30A2",
     noMatchingIssues:
       "\u8A72\u5F53\u3059\u308B Issue \u304C\u3042\u308A\u307E\u305B\u3093",
-    byLabel: "\u30E9\u30D9\u30EB / \u30BF\u30B0\u3067\u7D5E\u308A\u8FBC\u307F",
     displayLimit: "\u8868\u793A\u4E0A\u9650",
     layout: "\u30EC\u30A4\u30A2\u30A6\u30C8",
     view: "\u8868\u793A",
@@ -787,8 +782,6 @@ const ja: Messages = {
     completed: "\u5B8C\u4E86",
     start: "Start",
     finish: "Finish",
-    selectStartPointHint:
-      "\u8D77\u70B9\u3092\u9078\u629E\u3059\u308B\u3068\u4F9D\u5B58\u95A2\u4FC2\u30B0\u30E9\u30D5\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002",
     dependencyEdge: "\u4F9D\u5B58\u95A2\u4FC2 (blocked by)",
     subIssueGroup:
       "\u89AA Issue\uFF08\u30B5\u30D6\u30A4\u30B7\u30E5\u30FC\u3092\u542B\u3080\uFF09",
