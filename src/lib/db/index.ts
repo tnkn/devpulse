@@ -80,11 +80,28 @@ async function runMigrations(conn: DuckDBConnection): Promise<void> {
 }
 
 /**
+ * DuckDB refuses to open a file another process already holds. That is
+ * not damage — the database is intact and someone else is using it — so
+ * it must never reach the recovery path below, which deletes files.
+ */
+function isLockConflict(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("Could not set lock on file") ||
+    message.includes("Conflicting lock is held")
+  );
+}
+
+/**
  * Open a DuckDB instance with WAL recovery handling.
  *
  * If DuckDBInstance.create() fails (e.g. corrupt WAL), retry with:
  *   1. Delete .wal file → retry (loses uncommitted data since last checkpoint)
  *   2. Delete .duckdb + .wal → re-create & re-migrate from JSON (full rebuild)
+ *
+ * A lock conflict is reported as-is instead: destroying a healthy
+ * database because a second process (another dev server, a seed script)
+ * has it open would lose everything that was collected into it.
  */
 async function openInstance(
   repoKey: string,
@@ -101,6 +118,12 @@ async function openInstance(
     return { instance, isNew };
   } catch (err) {
     if (isNew) throw err; // No recovery possible for a brand-new DB
+    if (isLockConflict(err)) {
+      console.error(
+        `[db] ${repoKey} is open in another process; not touching it.`,
+      );
+      throw err;
+    }
     console.error(`[db] Failed to open ${repoKey}:`, err);
   }
 
@@ -116,6 +139,12 @@ async function openInstance(
       );
       return { instance, isNew: false };
     } catch (err2) {
+      if (isLockConflict(err2)) {
+        console.error(
+          `[db] ${repoKey} is open in another process; not touching it.`,
+        );
+        throw err2;
+      }
       console.error(
         `[db] Still failed after WAL deletion for ${repoKey}:`,
         err2,
