@@ -212,6 +212,16 @@ export type Messages = {
     byLabel: string;
     displayLimit: string;
     layout: string;
+    view: string;
+    viewGraph: string;
+    viewTable: string;
+    colIssue: string;
+    colTitle: string;
+    colStatus: string;
+    colAssignees: string;
+    colParent: string;
+    colBlockedBy: string;
+    colBlocking: string;
     layoutTopDown: string;
     layoutLeftRight: string;
     noLimit: string;
@@ -457,6 +467,16 @@ const en: Messages = {
     byLabel: "By label / tag",
     displayLimit: "Display limit",
     layout: "Layout",
+    view: "View",
+    viewGraph: "Graph",
+    viewTable: "Table",
+    colIssue: "Issue",
+    colTitle: "Title",
+    colStatus: "Status",
+    colAssignees: "Assignees",
+    colParent: "Parent",
+    colBlockedBy: "Blocked by",
+    colBlocking: "Blocking",
     layoutTopDown: "Top to bottom",
     layoutLeftRight: "Left to right",
     noLimit: "No limit",
@@ -742,6 +762,16 @@ const ja: Messages = {
     byLabel: "\u30E9\u30D9\u30EB / \u30BF\u30B0\u3067\u7D5E\u308A\u8FBC\u307F",
     displayLimit: "\u8868\u793A\u4E0A\u9650",
     layout: "\u30EC\u30A4\u30A2\u30A6\u30C8",
+    view: "\u8868\u793A",
+    viewGraph: "\u30B0\u30E9\u30D5",
+    viewTable: "\u30C6\u30FC\u30D6\u30EB",
+    colIssue: "Issue",
+    colTitle: "\u30BF\u30A4\u30C8\u30EB",
+    colStatus: "\u30B9\u30C6\u30FC\u30BF\u30B9",
+    colAssignees: "\u62C5\u5F53\u8005",
+    colParent: "\u89AA Issue",
+    colBlockedBy: "\u30D6\u30ED\u30C3\u30AF\u5143",
+    colBlocking: "\u30D6\u30ED\u30C3\u30AF\u5148",
     layoutTopDown: "\u4E0A\u304B\u3089\u4E0B",
     layoutLeftRight: "\u5DE6\u304B\u3089\u53F3",
     noLimit: "\u4E0A\u9650\u306A\u3057",

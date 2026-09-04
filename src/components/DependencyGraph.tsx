@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
+import { DependencyTable } from "@/components/dependency-graph/DependencyTable";
 import {
   buildDependencyGraph,
   capVisibleIssueNumbers,
@@ -37,6 +38,7 @@ interface Props {
 }
 
 type StartMode = "all" | "issue" | "label";
+type ViewMode = "graph" | "table";
 
 /** 0 stands for "no limit". */
 const DISPLAY_LIMIT_OPTIONS = [100, 250, DEFAULT_DISPLAY_LIMIT, 1000, 2000, 0];
@@ -55,6 +57,7 @@ export function DependencyGraph({
   const [issueQuery, setIssueQuery] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DEFAULT_DISPLAY_LIMIT);
   const [direction, setDirection] = useState<LayoutDirection>("TB");
+  const [view, setView] = useState<ViewMode>("graph");
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -356,21 +359,52 @@ export function DependencyGraph({
           </select>
         )}
 
-        <label className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <span className="text-gray-500 dark:text-gray-400">
-            {t.dependencies.layout}
+            {t.dependencies.view}
           </span>
-          <select
-            value={direction}
-            onChange={(e) =>
-              handleDirectionChange(e.target.value as LayoutDirection)
-            }
-            className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-          >
-            <option value="TB">{t.dependencies.layoutTopDown}</option>
-            <option value="LR">{t.dependencies.layoutLeftRight}</option>
-          </select>
-        </label>
+          <div className="flex overflow-hidden rounded border border-gray-300 dark:border-gray-600">
+            {(
+              [
+                ["graph", t.dependencies.viewGraph],
+                ["table", t.dependencies.viewTable],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                aria-pressed={view === mode}
+                className={`px-3 py-1 text-sm ${
+                  view === mode
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Rank direction means nothing to a table. */}
+        {view === "graph" && (
+          <label className="flex items-center gap-2">
+            <span className="text-gray-500 dark:text-gray-400">
+              {t.dependencies.layout}
+            </span>
+            <select
+              value={direction}
+              onChange={(e) =>
+                handleDirectionChange(e.target.value as LayoutDirection)
+              }
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+            >
+              <option value="TB">{t.dependencies.layoutTopDown}</option>
+              <option value="LR">{t.dependencies.layoutLeftRight}</option>
+            </select>
+          </label>
+        )}
 
         <label className="flex items-center gap-2">
           <span className="text-gray-500 dark:text-gray-400">
@@ -392,10 +426,14 @@ export function DependencyGraph({
 
       <section className="flex min-h-0 flex-1 flex-col border border-gray-200 dark:border-gray-700 rounded-lg p-3">
         <div className="flex items-baseline justify-between gap-4 mb-2">
-          <h2 className="text-base font-semibold">{t.dependencies.graph}</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
-            {t.dependencies.connectHint}
-          </p>
+          <h2 className="text-base font-semibold">
+            {view === "graph" ? t.dependencies.graph : t.dependencies.viewTable}
+          </h2>
+          {view === "graph" && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
+              {t.dependencies.connectHint}
+            </p>
+          )}
         </div>
         {totalVisible > visibleNumbers.size && (
           <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">
@@ -403,7 +441,15 @@ export function DependencyGraph({
           </p>
         )}
         <div className="min-h-0 flex-1">
-          {nodes.length > 0 ? (
+          {view === "table" ? (
+            <DependencyTable
+              issues={issues}
+              edges={edges}
+              subIssues={subIssues}
+              visibleNumbers={visibleNumbers}
+              repoFullName={repoFullName}
+            />
+          ) : nodes.length > 0 ? (
             <DependencyFlow
               nodes={nodes}
               links={links}
