@@ -4,6 +4,10 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DependencyTable } from "@/components/dependency-graph/DependencyTable";
 import {
+  type DependencyFilters,
+  dependencyFiltersToQuery,
+} from "@/lib/dependencies/filter-params";
+import {
   buildDependencyGraph,
   capVisibleIssueNumbers,
   computeVisibleIssueNumbers,
@@ -42,6 +46,8 @@ interface Props {
   subIssues: IssueSubIssueEdge[];
   projectFields: ProjectFieldDefinition[];
   projectFieldsSyncedAt: string | null;
+  /** Read from the query string on the server; see filter-params.ts. */
+  initialFilters: DependencyFilters;
 }
 
 type ViewMode = "graph" | "table";
@@ -57,16 +63,21 @@ export function DependencyGraph({
   subIssues,
   projectFields,
   projectFieldsSyncedAt,
+  initialFilters,
 }: Props) {
   const { t } = useI18n();
   const [edges, setEdges] = useState<IssueDependencyEdge[]>(initialEdges);
-  const [selectedIssues, setSelectedIssues] = useState<number[]>([]);
+  const [selectedIssues, setSelectedIssues] = useState<number[]>(
+    initialFilters.issueNumbers,
+  );
   const [issueQuery, setIssueQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(DEFAULT_DISPLAY_LIMIT);
   const [direction, setDirection] = useState<LayoutDirection>("TB");
   const [view, setView] = useState<ViewMode>("graph");
-  const [selectedLabel, setSelectedLabel] = useState<string>("");
+  const [selectedLabel, setSelectedLabel] = useState<string>(
+    initialFilters.label,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   // Kept here rather than in the canvas: switching the start point can
@@ -79,6 +90,25 @@ export function DependencyGraph({
   useEffect(() => {
     setEdges(initialEdges);
   }, [initialEdges]);
+
+  // Written straight to the History API rather than through the router:
+  // this page is force-dynamic, so router.replace would re-run the server
+  // component — and re-query DuckDB — on every tick of a checkbox, for a
+  // filter that is applied entirely in the browser. Next supports the
+  // native call and keeps its own router state in step with it.
+  //
+  // replaceState, not pushState: picking issues one at a time would
+  // otherwise bury whatever the person was looking at before under a
+  // dozen history entries they have to click back through.
+  useEffect(() => {
+    const query = dependencyFiltersToQuery(
+      new URLSearchParams(window.location.search),
+      { label: selectedLabel, issueNumbers: selectedIssues },
+    );
+    const next = `${window.location.pathname}${query}${window.location.hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== current) window.history.replaceState(null, "", next);
+  }, [selectedLabel, selectedIssues]);
 
   const pickerRef = useRef<HTMLDivElement>(null);
 

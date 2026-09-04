@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DependencyGraph } from "@/components/DependencyGraph";
 import { LocaleToggle, UpdateButton } from "@/components/ui";
 import { getIssueRelations, getRepoData } from "@/lib/data";
+import { parseDependencyFilters } from "@/lib/dependencies/filter-params";
 import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +12,13 @@ interface PageProps {
   params: Promise<{
     repo: string;
   }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function DependencyGraphPage({ params }: PageProps) {
+export default async function DependencyGraphPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { repo } = await params;
   const decodedRepo = decodeURIComponent(repo);
 
@@ -28,6 +33,14 @@ export default async function DependencyGraphPage({ params }: PageProps) {
   }
 
   const t = await getMessages();
+
+  // Parsed here rather than in the browser: the component renders on the
+  // server first, so reading the URL client-side would start with no
+  // filters and hydrate into a different tree than was sent.
+  const filters = parseDependencyFilters(await searchParams, {
+    labels: new Set(data.issues.flatMap((i) => i.labels.map((l) => l.name))),
+    issueNumbers: new Set(data.issues.map((i) => i.number)),
+  });
 
   return (
     // Fixed to the viewport rather than growing with content: the graph is
@@ -72,6 +85,7 @@ export default async function DependencyGraphPage({ params }: PageProps) {
           subIssues={relations.subIssues}
           projectFields={relations.projectFields}
           projectFieldsSyncedAt={relations.projectFieldsSyncedAt}
+          initialFilters={filters}
         />
       </div>
     </main>
