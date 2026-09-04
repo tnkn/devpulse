@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DependencyTable } from "@/components/dependency-graph/DependencyTable";
+import { useBoardProblem } from "@/components/dependency-graph/useBoardProblem";
 import {
   type DependencyFilters,
   dependencyFiltersToQuery,
@@ -238,6 +239,10 @@ export function DependencyGraph({
   );
 
   const emptyMessage = t.dependencies.noEdges;
+
+  // Shown in both views: the cards carry Priority and Size too, so a
+  // board nobody can read from is just as invisible on the graph.
+  const boardProblem = useBoardProblem(projectFields, projectFieldsSyncedAt);
 
   const addDependency = useCallback(
     async (blockerNumber: number, blockedNumber: number): Promise<boolean> => {
@@ -486,6 +491,11 @@ export function DependencyGraph({
             </p>
           )}
         </div>
+        {boardProblem && (
+          <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+            {boardProblem}
+          </p>
+        )}
         {totalVisible > visibleNumbers.size && (
           <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">
             {t.dependencies.limitedTo(visibleNumbers.size, totalVisible)}

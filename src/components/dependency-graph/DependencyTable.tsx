@@ -6,6 +6,7 @@ import {
   AssigneeCell,
   EditableCell,
 } from "@/components/dependency-graph/EditableCell";
+import { useBoardProblem } from "@/components/dependency-graph/useBoardProblem";
 import { priorityRank } from "@/lib/dependencies/priority";
 import {
   buildDependencyRows,
@@ -166,29 +167,23 @@ export function DependencyTable({
     [repoKey, router],
   );
 
+  // Announced above both views by DependencyGraph; still needed here to
+  // decide whether an individual cell can be edited.
+  const boardProblem = useBoardProblem(projectFields, projectFieldsSyncedAt);
+
   /**
-   * Why a Priority or Size cell cannot be edited, or undefined when it
-   * can. Three different situations reach this point and they need
-   * opposite advice, so they are told apart rather than sharing one
-   * message: nothing collected yet, nothing to collect, or this
-   * particular issue not being on a board.
+   * Why one Priority or Size cell cannot be edited, or undefined when it
+   * can. Beyond the repository-wide causes there is a per-issue one —
+   * this issue is on no board — which stays on the cell, because it is
+   * true of that row and not of its neighbours.
    */
   const uneditableReason = useCallback(
     (projectItemId: string | null): string | undefined => {
-      if (projectFieldsSyncedAt === null) {
-        return t.dependencies.projectsNotCollected;
-      }
-      const matched = projectFields.filter((d) => d.kind !== "other");
-      if (matched.length === 0) {
-        const seen = projectFields.map((d) => d.fieldName);
-        return seen.length > 0
-          ? t.dependencies.noProjectFieldsFound(seen.join(", "))
-          : t.dependencies.noProjectFields;
-      }
+      if (boardProblem) return boardProblem;
       if (!projectItemId) return t.dependencies.notOnBoard;
       return undefined;
     },
-    [projectFields, projectFieldsSyncedAt, t],
+    [boardProblem, t],
   );
 
   /** The options a board offers for one of the two fields. */
