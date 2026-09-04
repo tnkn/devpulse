@@ -219,6 +219,9 @@ export type Messages = {
     colStatus: string;
     colAssignees: string;
     colParent: string;
+    clickToEdit: string;
+    notOnBoard: string;
+    noAssignableUsers: string;
     colPriority: string;
     colSize: string;
     colBlockedBy: string;
@@ -474,6 +477,11 @@ const en: Messages = {
     colStatus: "Status",
     colAssignees: "Assignees",
     colParent: "Parent",
+    clickToEdit: "Click to edit",
+    notOnBoard:
+      "This issue is not on a project board, so it has no Priority or Size to set.",
+    noAssignableUsers:
+      "No assignable users. The token needs read access to the repository's collaborators.",
     colPriority: "Priority",
     colSize: "Size",
     colBlockedBy: "Blocked by",
@@ -769,6 +777,11 @@ const ja: Messages = {
     colStatus: "\u30B9\u30C6\u30FC\u30BF\u30B9",
     colAssignees: "\u62C5\u5F53\u8005",
     colParent: "\u89AA Issue",
+    clickToEdit: "\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u7DE8\u96C6",
+    notOnBoard:
+      "\u3053\u306E Issue \u306F\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u8F09\u3063\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8A2D\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002",
+    noAssignableUsers:
+      "\u5272\u308A\u5F53\u3066\u53EF\u80FD\u306A\u30E6\u30FC\u30B6\u30FC\u304C\u3044\u307E\u305B\u3093\u3002\u30C8\u30FC\u30AF\u30F3\u306B\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30B3\u30E9\u30DC\u30EC\u30FC\u30BF\u30FC\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059\u3002",
     colPriority: "\u512A\u5148\u5EA6",
     colSize: "\u30B5\u30A4\u30BA",
     colBlockedBy: "\u30D6\u30ED\u30C3\u30AF\u5143",

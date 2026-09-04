@@ -1,12 +1,17 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { getConnection, getRepositoryKeys } from "@/lib/db";
-import { listIssueDependencies, listIssueSubIssues } from "@/lib/db/upsert";
+import {
+  listIssueDependencies,
+  listIssueSubIssues,
+  listProjectFields,
+} from "@/lib/db/upsert";
 import type {
   Commit,
   DumpMetadata,
   Issue,
   IssueDependencyEdge,
   IssueSubIssueEdge,
+  ProjectFieldDefinition,
   PullRequest,
   Release,
   Repository,
@@ -99,7 +104,7 @@ export async function getRepoData(repoName: string): Promise<{
         "SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC",
       ),
       conn.runAndReadAll(
-        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, priority, size FROM issues ORDER BY number DESC",
+        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, priority, size, project_id, project_item_id FROM issues ORDER BY number DESC",
       ),
       conn.runAndReadAll(
         "SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC",
@@ -188,6 +193,8 @@ export async function getRepoData(repoName: string): Promise<{
       assignees: parseAssigneesJson(r[7]),
       priority: r[8] != null ? String(r[8]) : null,
       size: r[9] != null ? String(r[9]) : null,
+      project_id: r[10] != null ? String(r[10]) : null,
+      project_item_id: r[11] != null ? String(r[11]) : null,
     }));
 
     // Parse reviews
@@ -240,17 +247,20 @@ function parseAssigneesJson(value: unknown): string[] {
 export async function getIssueRelations(repoName: string): Promise<{
   dependencies: IssueDependencyEdge[];
   subIssues: IssueSubIssueEdge[];
+  /** The editable board fields, so a cell knows what it may offer. */
+  projectFields: ProjectFieldDefinition[];
 }> {
   let conn: DuckDBConnection;
   try {
     conn = await getConnection(repoName);
   } catch {
-    return { dependencies: [], subIssues: [] };
+    return { dependencies: [], subIssues: [], projectFields: [] };
   }
   try {
     return {
       dependencies: await listIssueDependencies(conn),
       subIssues: await listIssueSubIssues(conn),
+      projectFields: await listProjectFields(conn),
     };
   } finally {
     conn.closeSync();

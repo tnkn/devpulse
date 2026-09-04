@@ -135,6 +135,26 @@ ALTER TABLE issues ADD COLUMN IF NOT EXISTS issue_id BIGINT;
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS priority TEXT;
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS size TEXT;
 
+-- The board item Priority and Size were read from, which is also where
+-- an edit writes back. A project field only exists as part of an item,
+-- so without these there is nothing to address a mutation to.
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS project_id TEXT;
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS project_item_id TEXT;
+
+-- The editable fields on each board: their ids, and for a single select
+-- the options it accepts. Cached because an issue with no Priority set
+-- carries no value to learn the field's id from.
+CREATE TABLE IF NOT EXISTS project_fields (
+  project_id TEXT NOT NULL,
+  field_id TEXT NOT NULL,
+  project_title TEXT,
+  field_name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  data_type TEXT NOT NULL,
+  options_json TEXT DEFAULT '[]',
+  PRIMARY KEY (project_id, field_id)
+);
+
 -- Same reasoning as issues_assignees_synced_at: project fields live
 -- outside the issue payload, so a differential run would never fill them
 -- in for issues collected before this existed.

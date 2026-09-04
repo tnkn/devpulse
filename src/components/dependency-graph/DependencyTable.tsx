@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AssigneeCell,
+  EditableCell,
+} from "@/components/dependency-graph/EditableCell";
 import { priorityRank } from "@/lib/dependencies/priority";
 import {
   buildDependencyRows,
@@ -15,9 +20,12 @@ import type {
   IssueDependencyEdge,
   IssueProgressStatus,
   IssueSubIssueEdge,
+  ProjectFieldDefinition,
 } from "@/types";
 
 interface Props {
+  repoKey: string;
+  projectFields: ProjectFieldDefinition[];
   issues: Issue[];
   edges: IssueDependencyEdge[];
   subIssues: IssueSubIssueEdge[];
@@ -97,6 +105,8 @@ function RefCell({
  * count what an issue is holding up, or sort by how blocked things are.
  */
 export function DependencyTable({
+  repoKey,
+  projectFields,
   issues,
   edges,
   subIssues,
@@ -104,8 +114,66 @@ export function DependencyTable({
   repoFullName,
 }: Props) {
   const { t } = useI18n();
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<DependencySortKey>("number");
   const [direction, setDirection] = useState<SortDirection>("asc");
+  const [assignableUsers, setAssignableUsers] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only the collaborator list has to be fetched: the board's fields
+  // arrive with the page, having been cached at collection time.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/github/issue-fields?key=${encodeURIComponent(repoKey)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setAssignableUsers(data.assignableUsers ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [repoKey]);
+
+  /**
+   * Sends one edit and refreshes from the server.
+   *
+   * router.refresh() rather than patching local state: the server
+   * component re-reads the row GitHub accepted, so the table can never
+   * show a value the write did not actually produce.
+   */
+  const submit = useCallback(
+    async (body: Record<string, unknown>) => {
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/github/issue-fields?key=${encodeURIComponent(repoKey)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to save");
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save");
+      }
+    },
+    [repoKey, router],
+  );
+
+  /** The options a board offers for one of the two fields. */
+  const optionsFor = useCallback(
+    (kind: "priority" | "size", projectId: string | null) => {
+      const definition = projectFields.find(
+        (d) => d.kind === kind && (!projectId || d.projectId === projectId),
+      );
+      return definition?.options.map((o) => o.name) ?? [];
+    },
+    [projectFields],
+  );
 
   const rows = useMemo(
     () =>
@@ -156,128 +224,176 @@ export function DependencyTable({
 
   return (
     // The table scrolls inside its own box so the page itself never does.
-    <div className="h-full overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
-      <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 bg-white dark:bg-gray-900">
-          <tr className="border-b border-gray-200 dark:border-gray-700">
-            {columns.map((column) => {
-              const active = column.key === sortKey;
-              return (
-                <th
-                  key={column.key}
-                  scope="col"
-                  // aria-sort belongs on the header cell, not the control
-                  // inside it: it describes the column, not the button.
-                  aria-sort={
-                    active
-                      ? direction === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : "none"
-                  }
-                  className={`px-3 py-2 text-left font-semibold ${column.wide ? "w-2/5" : ""}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(column.key)}
-                    className="flex items-center gap-1 hover:underline"
+    <div className="flex h-full flex-col">
+      {error && (
+        <p className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-white dark:bg-gray-900">
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              {columns.map((column) => {
+                const active = column.key === sortKey;
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    // aria-sort belongs on the header cell, not the control
+                    // inside it: it describes the column, not the button.
+                    aria-sort={
+                      active
+                        ? direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className={`px-3 py-2 text-left font-semibold ${column.wide ? "w-2/5" : ""}`}
                   >
-                    {column.label}
-                    <span
-                      className={
-                        active
-                          ? "text-gray-500 dark:text-gray-400"
-                          : "text-transparent"
-                      }
-                      aria-hidden="true"
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(column.key)}
+                      className="flex items-center gap-1 hover:underline"
                     >
-                      {active && direction === "desc" ? "▼" : "▲"}
-                    </span>
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row: DependencyRow) => (
-            <tr
-              key={row.number}
-              className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-            >
-              <td className="px-3 py-2 whitespace-nowrap">
-                <IssueLink
-                  number={row.number}
-                  title={row.title}
-                  repoFullName={repoFullName}
-                />
-              </td>
-              <td className="px-3 py-2">
-                <a
-                  href={row.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={row.title}
-                  className="hover:underline"
-                >
-                  {row.title}
-                </a>
-              </td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                <span
-                  className={`inline-block rounded border px-2 py-0.5 text-xs ${STATUS_BADGE_CLASS[row.status]}`}
-                >
-                  {row.status === "completed"
-                    ? t.dependencies.completed
-                    : row.status === "started"
-                      ? t.dependencies.started
-                      : t.dependencies.notStarted}
-                </span>
-              </td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                {row.priority ? (
-                  <span
-                    className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${priorityBadgeClass(row.priority)}`}
-                  >
-                    {row.priority}
-                  </span>
-                ) : (
-                  <span className="text-gray-400 dark:text-gray-600">—</span>
-                )}
-              </td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                {row.size ?? (
-                  <span className="text-gray-400 dark:text-gray-600">—</span>
-                )}
-              </td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                {row.assignees.length > 0 ? (
-                  row.assignees.join(", ")
-                ) : (
-                  <span className="text-gray-400 dark:text-gray-600">—</span>
-                )}
-              </td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                {row.parent ? (
+                      {column.label}
+                      <span
+                        className={
+                          active
+                            ? "text-gray-500 dark:text-gray-400"
+                            : "text-transparent"
+                        }
+                        aria-hidden="true"
+                      >
+                        {active && direction === "desc" ? "▼" : "▲"}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row: DependencyRow) => (
+              <tr
+                key={row.number}
+                className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+              >
+                <td className="px-3 py-2 whitespace-nowrap">
                   <IssueLink
-                    number={row.parent.number}
-                    title={row.parent.title}
+                    number={row.number}
+                    title={row.title}
                     repoFullName={repoFullName}
                   />
-                ) : (
-                  <span className="text-gray-400 dark:text-gray-600">—</span>
-                )}
-              </td>
-              <td className="px-3 py-2">
-                <RefCell numbers={row.blockedBy} repoFullName={repoFullName} />
-              </td>
-              <td className="px-3 py-2">
-                <RefCell numbers={row.blocking} repoFullName={repoFullName} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                </td>
+                <td className="px-3 py-2">
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={row.title}
+                    className="hover:underline"
+                  >
+                    {row.title}
+                  </a>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <span
+                    className={`inline-block rounded border px-2 py-0.5 text-xs ${STATUS_BADGE_CLASS[row.status]}`}
+                  >
+                    {row.status === "completed"
+                      ? t.dependencies.completed
+                      : row.status === "started"
+                        ? t.dependencies.started
+                        : t.dependencies.notStarted}
+                  </span>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <EditableCell
+                    value={row.priority}
+                    options={optionsFor("priority", row.projectId)}
+                    disabledReason={
+                      row.projectItemId ? undefined : t.dependencies.notOnBoard
+                    }
+                    onChange={(next) =>
+                      submit({
+                        issue_number: row.number,
+                        field: "priority",
+                        value: next,
+                      })
+                    }
+                  >
+                    {row.priority ? (
+                      <span
+                        className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${priorityBadgeClass(row.priority)}`}
+                      >
+                        {row.priority}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-600">
+                        —
+                      </span>
+                    )}
+                  </EditableCell>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <EditableCell
+                    value={row.size}
+                    options={optionsFor("size", row.projectId)}
+                    disabledReason={
+                      row.projectItemId ? undefined : t.dependencies.notOnBoard
+                    }
+                    onChange={(next) =>
+                      submit({
+                        issue_number: row.number,
+                        field: "size",
+                        value: next,
+                      })
+                    }
+                  >
+                    {row.size ?? (
+                      <span className="text-gray-400 dark:text-gray-600">
+                        —
+                      </span>
+                    )}
+                  </EditableCell>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <AssigneeCell
+                    assignees={row.assignees}
+                    candidates={assignableUsers}
+                    onChange={(next) =>
+                      submit({
+                        issue_number: row.number,
+                        field: "assignees",
+                        assignees: next,
+                      })
+                    }
+                  />
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {row.parent ? (
+                    <IssueLink
+                      number={row.parent.number}
+                      title={row.parent.title}
+                      repoFullName={repoFullName}
+                    />
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-600">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <RefCell
+                    numbers={row.blockedBy}
+                    repoFullName={repoFullName}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <RefCell numbers={row.blocking} repoFullName={repoFullName} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

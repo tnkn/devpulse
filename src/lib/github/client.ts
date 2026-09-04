@@ -585,6 +585,68 @@ export async function removeIssueBlockedBy(
   }
 }
 
+/**
+ * Replaces an issue's assignees with exactly this set.
+ *
+ * GitHub documents a trap here: "Without push access to the repository,
+ * assignee changes are silently dropped." The response still comes back
+ * 200 with the unchanged issue, so the result is read back and compared
+ * — a caller that trusted the status code would report success for a
+ * change that never happened.
+ *
+ * Returns the assignees the issue actually ended up with.
+ */
+export async function setIssueAssignees(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  assignees: string[],
+  token?: string,
+): Promise<string[]> {
+  const h = makeAuthHeaders(await resolveToken(token));
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${issueNumber}`,
+    {
+      method: "PATCH",
+      headers: { ...h, "Content-Type": "application/json" },
+      body: JSON.stringify({ assignees }),
+    },
+  );
+  if (!res.ok) {
+    throw new GitHubApiError(res.status, await readErrorMessage(res));
+  }
+
+  const body = (await res.json()) as { assignees?: { login?: string }[] };
+  const applied = (body.assignees ?? [])
+    .map((a) => a.login)
+    .filter((login): login is string => Boolean(login));
+
+  const wanted = [...assignees].sort().join(",");
+  if (applied.slice().sort().join(",") !== wanted) {
+    throw new GitHubApiError(
+      403,
+      "GitHub accepted the request but did not change the assignees. Setting assignees needs push access to the repository.",
+    );
+  }
+  return applied;
+}
+
+/** Users who may be assigned to an issue in this repository. */
+export async function getAssignableUsers(
+  owner: string,
+  repo: string,
+  token?: string,
+): Promise<string[]> {
+  const raw = await fetchAllPages<{ login?: string }>(
+    `${GITHUB_API}/repos/${owner}/${repo}/assignees?per_page=100`,
+    token,
+    3,
+  );
+  return raw
+    .map((u) => u.login)
+    .filter((login): login is string => Boolean(login));
+}
+
 export async function getIssues(
   owner: string,
   repo: string,

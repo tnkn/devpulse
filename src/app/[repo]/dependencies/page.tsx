@@ -70,6 +70,7 @@ export default async function DependencyGraphPage({ params }: PageProps) {
           issues={data.issues}
           initialEdges={relations.dependencies}
           subIssues={relations.subIssues}
+          projectFields={relations.projectFields}
         />
       </div>
     </main>
