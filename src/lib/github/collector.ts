@@ -3,6 +3,8 @@ import { checkpoint, getConnection } from "@/lib/db";
 import {
   getIssueRelationsSyncedAt,
   getIssuesAssigneesSyncedAt,
+  getIssuesProjectFieldsSyncedAt,
+  getStoredProjectFields,
   replaceIssueRelations,
   updatePRSize,
   upsertCommits,
@@ -15,7 +17,9 @@ import {
 import { getDecryptedToken } from "@/lib/tokens";
 import type {
   CollectionJob,
+  Issue,
   IssueDependencyEdge,
+  IssueProjectFields,
   IssueSubIssueEdge,
 } from "@/types";
 import {
@@ -28,7 +32,9 @@ import {
   getPullRequests,
   getReleases,
   getSubIssues,
+  resolveToken,
 } from "./client";
+import { fetchIssueProjectFields, ProjectsUnavailableError } from "./projects";
 
 const globalJobs = globalThis as unknown as {
   __dev_vis_jobs?: Map<string, CollectionJob>;
@@ -104,6 +110,7 @@ async function getLatestTimestamps(repoKey: string): Promise<{
   issueSince: string | null;
   assigneesSyncedAt: string | null;
   relationsSyncedAt: string | null;
+  projectFieldsSyncedAt: string | null;
 }> {
   const conn = await getConnection(repoKey);
   try {
@@ -124,10 +131,78 @@ async function getLatestTimestamps(repoKey: string): Promise<{
       issueSince: issueRows[0]?.[0] != null ? String(issueRows[0][0]) : null,
       assigneesSyncedAt,
       relationsSyncedAt: await getIssueRelationsSyncedAt(conn),
+      projectFieldsSyncedAt: await getIssuesProjectFieldsSyncedAt(conn),
     };
   } finally {
     conn.closeSync();
   }
+}
+
+/**
+ * Attaches Priority and Size from Projects v2 to the issues about to be
+ * stored.
+ *
+ * Written onto the issue objects rather than applied afterwards because
+ * the issue upsert rewrites whole rows: a later UPDATE would work, but
+ * anything between the two writes would see the fields blank.
+ *
+ * Returns whether the fields are now known to be current. A token that
+ * cannot see projects is not a failed collection — the run carries on
+ * with whatever was already stored, and the marker stays unset so the
+ * next run tries a full pass again.
+ */
+async function attachProjectFields(
+  conn: DuckDBConnection,
+  issues: Issue[],
+  owner: string,
+  repo: string,
+  token: string | undefined,
+  since?: string,
+): Promise<boolean> {
+  if (issues.length === 0) return true;
+
+  let fetched: Map<number, IssueProjectFields>;
+  try {
+    fetched = await fetchIssueProjectFields(
+      owner,
+      repo,
+      await resolveToken(token),
+      since,
+    );
+  } catch (err) {
+    if (err instanceof ProjectsUnavailableError) {
+      console.warn(`[collector] Skipping project fields: ${err.message}`);
+    } else {
+      console.warn(
+        `[collector] Failed to read project fields: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+    // Carry over what is already stored so a run that could not read
+    // Projects does not blank fields it simply could not see.
+    const stored = await getStoredProjectFields(
+      conn,
+      issues.map((i) => i.number),
+    );
+    for (const issue of issues) {
+      const existing = stored.get(issue.number);
+      issue.priority = existing?.priority ?? null;
+      issue.size = existing?.size ?? null;
+    }
+    return false;
+  }
+
+  // The fetch succeeded, so an issue missing from the result genuinely
+  // has no Priority or Size any more — it was taken off the board, or
+  // the field was cleared. Absent means null, not "leave it alone".
+  for (const issue of issues) {
+    const fields = fetched.get(issue.number);
+    issue.priority = fields?.priority ?? null;
+    issue.size = fields?.size ?? null;
+  }
+  console.log(
+    `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
+  );
+  return true;
 }
 
 /**
@@ -210,8 +285,18 @@ async function runCollection(job: CollectionJob): Promise<void> {
     // assignee list forever, because `since` only returns issues updated
     // after the last run. Re-fetch them all once, then go back to
     // differential fetches.
+    // Project fields are in the same position: they live outside the
+    // issue payload, so issues collected before this existed would never
+    // acquire them from a differential run.
+    const needsProjectFieldBackfill = !timestamps.projectFieldsSyncedAt;
     const needsAssigneeBackfill = !timestamps.assigneesSyncedAt;
-    const issueSince = needsAssigneeBackfill ? null : timestamps.issueSince;
+    // Set by the project field sync below; only a run that actually read
+    // Projects may stamp the marker.
+    let projectFieldsCurrent = false;
+    const issueSince =
+      needsAssigneeBackfill || needsProjectFieldBackfill
+        ? null
+        : timestamps.issueSince;
 
     const isDiff = !!(
       timestamps.commitSince ||
@@ -275,6 +360,17 @@ async function runCollection(job: CollectionJob): Promise<void> {
       await upsertCommits(conn, newCommits);
       await upsertPullRequests(conn, newPulls);
       await upsertReleases(conn, newReleases);
+
+      job.progress = "Reading project fields...";
+      projectFieldsCurrent = await attachProjectFields(
+        conn,
+        newIssues,
+        owner,
+        repo,
+        token,
+        issueSince ?? undefined,
+      );
+
       await upsertIssues(conn, newIssues);
 
       // Collect CI status for merged PRs that don't have ci_failed yet
@@ -474,6 +570,12 @@ async function runCollection(job: CollectionJob): Promise<void> {
         job.token_id,
         timestamps.assigneesSyncedAt ?? new Date().toISOString(),
         relationsSyncedAt,
+        // Only stamped once a run has actually read Projects, so a token
+        // without project access keeps retrying the full pass instead of
+        // recording a sync that never happened.
+        projectFieldsCurrent
+          ? (timestamps.projectFieldsSyncedAt ?? new Date().toISOString())
+          : null,
       );
     } finally {
       conn.closeSync();

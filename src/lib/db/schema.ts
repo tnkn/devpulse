@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS metadata (
   issue_count INTEGER DEFAULT 0,
   token_id TEXT,
   issues_assignees_synced_at TEXT,
-  issue_relations_synced_at TEXT
+  issue_relations_synced_at TEXT,
+  issues_project_fields_synced_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS commits (
@@ -127,6 +128,17 @@ ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_assignees_synced_at TEXT;
 -- GitHub's global issue id, required by the issue dependencies API
 -- (its POST body takes an id, not an issue number).
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS issue_id BIGINT;
+
+-- Priority and Size as they read on the issue's Projects v2 board.
+-- Stored as text because a board may hold them as single-select options
+-- ("P1", "M"), as numbers (story points), or as free text.
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS priority TEXT;
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS size TEXT;
+
+-- Same reasoning as issues_assignees_synced_at: project fields live
+-- outside the issue payload, so a differential run would never fill them
+-- in for issues collected before this existed.
+ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_synced_at TEXT;
 
 CREATE TABLE IF NOT EXISTS issue_sub_issues (
   parent_number INTEGER NOT NULL,

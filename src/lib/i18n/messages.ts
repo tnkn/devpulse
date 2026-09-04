@@ -219,6 +219,8 @@ export type Messages = {
     colStatus: string;
     colAssignees: string;
     colParent: string;
+    colPriority: string;
+    colSize: string;
     colBlockedBy: string;
     colBlocking: string;
     layoutTopDown: string;
@@ -472,6 +474,8 @@ const en: Messages = {
     colStatus: "Status",
     colAssignees: "Assignees",
     colParent: "Parent",
+    colPriority: "Priority",
+    colSize: "Size",
     colBlockedBy: "Blocked by",
     colBlocking: "Blocking",
     layoutTopDown: "Top to bottom",
@@ -765,6 +769,8 @@ const ja: Messages = {
     colStatus: "\u30B9\u30C6\u30FC\u30BF\u30B9",
     colAssignees: "\u62C5\u5F53\u8005",
     colParent: "\u89AA Issue",
+    colPriority: "\u512A\u5148\u5EA6",
+    colSize: "\u30B5\u30A4\u30BA",
     colBlockedBy: "\u30D6\u30ED\u30C3\u30AF\u5143",
     colBlocking: "\u30D6\u30ED\u30C3\u30AF\u5148",
     layoutTopDown: "\u4E0A\u304B\u3089\u4E0B",

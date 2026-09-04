@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { priorityRank } from "@/lib/dependencies/priority";
 import {
   buildDependencyRows,
   type DependencyRow,
@@ -22,6 +23,21 @@ interface Props {
   subIssues: IssueSubIssueEdge[];
   visibleNumbers: Set<number>;
   repoFullName: string;
+}
+
+/** Same colours as the graph's cards, so one reading covers both views. */
+const PRIORITY_BADGE_CLASS: Record<string, string> = {
+  high: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+  medium: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+  low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+/** An unrecognised wording still shows, just without the emphasis. */
+function priorityBadgeClass(priority: string): string {
+  const rank = priorityRank(priority);
+  return rank
+    ? PRIORITY_BADGE_CLASS[rank]
+    : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
 }
 
 const STATUS_BADGE_CLASS: Record<IssueProgressStatus, string> = {
@@ -122,6 +138,8 @@ export function DependencyTable({
     { key: "number", label: t.dependencies.colIssue },
     { key: "title", label: t.dependencies.colTitle, wide: true },
     { key: "status", label: t.dependencies.colStatus },
+    { key: "priority", label: t.dependencies.colPriority },
+    { key: "size", label: t.dependencies.colSize },
     { key: "assignees", label: t.dependencies.colAssignees },
     { key: "parent", label: t.dependencies.colParent },
     { key: "blockedBy", label: t.dependencies.colBlockedBy },
@@ -215,6 +233,22 @@ export function DependencyTable({
                       ? t.dependencies.started
                       : t.dependencies.notStarted}
                 </span>
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {row.priority ? (
+                  <span
+                    className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${priorityBadgeClass(row.priority)}`}
+                  >
+                    {row.priority}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-600">—</span>
+                )}
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {row.size ?? (
+                  <span className="text-gray-400 dark:text-gray-600">—</span>
+                )}
               </td>
               <td className="px-3 py-2 whitespace-nowrap">
                 {row.assignees.length > 0 ? (

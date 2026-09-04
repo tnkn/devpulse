@@ -46,6 +46,7 @@ import {
   TERMINAL_NODE_HEIGHT,
   TERMINAL_NODE_WIDTH,
 } from "@/lib/dependencies/layout";
+import { priorityRank } from "@/lib/dependencies/priority";
 import { useI18n } from "@/lib/i18n";
 import type { IssueProgressStatus } from "@/types";
 
@@ -68,6 +69,8 @@ type IssueNodeData = {
   url: string;
   assignees: string[];
   labels: string[];
+  priority: string | null;
+  size: string | null;
   highlight: ChainHighlight;
 };
 type TerminalNodeData = { label: string; highlight: ChainHighlight };
@@ -77,6 +80,8 @@ type GroupNodeData = {
   title: string;
   status: IssueProgressStatus;
   url: string;
+  priority: string | null;
+  size: string | null;
   highlight: ChainHighlight;
 };
 
@@ -106,6 +111,26 @@ const STATUS_MINIMAP_COLOR: Record<IssueProgressStatus, string> = {
   started: "#f59e0b",
   completed: "#10b981",
 };
+
+/**
+ * Priority is drawn as a stripe down the leading edge rather than by
+ * colouring the card: the fill already means status, and two meanings in
+ * one colour would read as neither.
+ */
+const PRIORITY_STRIPE_CLASS: Record<string, string> = {
+  high: "!border-l-4 !border-l-red-500",
+  medium: "!border-l-4 !border-l-amber-500",
+  low: "!border-l-4 !border-l-slate-400",
+};
+
+const PRIORITY_BADGE_CLASS: Record<string, string> = {
+  high: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+  medium: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+  low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+const UNRANKED_BADGE_CLASS =
+  "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
 
 // Big enough to grab: these are the drag targets for creating a
 // dependency, not just decoration.
@@ -189,6 +214,41 @@ function useClickWithoutDrag() {
   return { onMouseDown, onClick };
 }
 
+/** The Priority and Size pair, drawn the same way wherever it appears. */
+function ProjectFieldBadges({
+  priority,
+  size,
+}: {
+  priority: string | null;
+  size: string | null;
+}) {
+  const { t } = useI18n();
+  const rank = priorityRank(priority);
+  if (!priority && !size) return null;
+  return (
+    // Pushed right so the badges line up down a column of cards instead
+    // of drifting with the width of what precedes them.
+    <span className="ml-auto flex shrink-0 items-center gap-1">
+      {priority && (
+        <span
+          title={`${t.dependencies.colPriority}: ${priority}`}
+          className={`rounded px-1 py-px text-[10px] leading-none font-semibold ${rank ? PRIORITY_BADGE_CLASS[rank] : UNRANKED_BADGE_CLASS}`}
+        >
+          {priority}
+        </span>
+      )}
+      {size && (
+        <span
+          title={`${t.dependencies.colSize}: ${size}`}
+          className={`rounded px-1 py-px text-[10px] leading-none font-semibold ${UNRANKED_BADGE_CLASS}`}
+        >
+          {size}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function IssueNode({
   data,
   sourcePosition,
@@ -198,6 +258,8 @@ function IssueNode({
   const clickGuard = useClickWithoutDrag();
   const { role } = data.highlight;
   const ring = role && role !== "muted" ? CHAIN_RING_CLASS[role] : "";
+  const rank = priorityRank(data.priority);
+  const stripe = rank ? PRIORITY_STRIPE_CLASS[rank] : "";
   return (
     <div style={highlightStyle(data.highlight)}>
       <Handle
@@ -212,10 +274,13 @@ function IssueNode({
         title={`#${data.number} ${data.title}${assignees ? ` (${assignees})` : ""}`}
         style={{ width: ISSUE_NODE_WIDTH, height: ISSUE_NODE_HEIGHT }}
         {...clickGuard}
-        className={`flex cursor-grab flex-col justify-center gap-1 rounded-lg border px-3 py-2 text-left no-underline shadow-sm transition-shadow hover:shadow-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 active:cursor-grabbing ${STATUS_NODE_CLASS[data.status]} ${ring}`}
+        className={`flex cursor-grab flex-col justify-center gap-1 rounded-lg border px-3 py-2 text-left no-underline shadow-sm transition-shadow hover:shadow-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 active:cursor-grabbing ${STATUS_NODE_CLASS[data.status]} ${stripe} ${ring}`}
       >
-        <span className="text-[11px] font-semibold opacity-70">
-          #{data.number}
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+          <span className="opacity-70">#{data.number}</span>
+          {/* Pushed right so the badges line up down a column of cards
+              instead of drifting with the issue number's width. */}
+          <ProjectFieldBadges priority={data.priority} size={data.size} />
         </span>
         <span className="line-clamp-2 text-xs leading-snug font-medium">
           {data.title}
@@ -297,6 +362,9 @@ function GroupNode({
         >
           <span className="opacity-60">#{data.number}</span>
           <span className="truncate">{data.title}</span>
+          {/* An epic carries its own Priority and Size; without these the
+              container would be the one place they disappear. */}
+          <ProjectFieldBadges priority={data.priority} size={data.size} />
         </a>
       </div>
       <Handle
@@ -591,6 +659,8 @@ function DependencyFlowInner({
             title: node.title,
             status: node.status,
             url: node.url,
+            priority: node.priority,
+            size: node.size,
             highlight: NO_HIGHLIGHT,
           },
         } satisfies GroupFlowNode;
@@ -612,6 +682,8 @@ function DependencyFlowInner({
           url: node.url,
           assignees: node.assignees,
           labels: node.labels,
+          priority: node.priority,
+          size: node.size,
           highlight: NO_HIGHLIGHT,
         },
       } satisfies IssueFlowNode;

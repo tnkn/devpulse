@@ -99,7 +99,7 @@ export async function getRepoData(repoName: string): Promise<{
         "SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC",
       ),
       conn.runAndReadAll(
-        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json FROM issues ORDER BY number DESC",
+        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, priority, size FROM issues ORDER BY number DESC",
       ),
       conn.runAndReadAll(
         "SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC",
@@ -186,6 +186,8 @@ export async function getRepoData(repoName: string): Promise<{
       closed_at: r[5] != null ? String(r[5]) : null,
       labels: parseLabelsJson(r[6]),
       assignees: parseAssigneesJson(r[7]),
+      priority: r[8] != null ? String(r[8]) : null,
+      size: r[9] != null ? String(r[9]) : null,
     }));
 
     // Parse reviews

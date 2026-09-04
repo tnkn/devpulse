@@ -30,7 +30,11 @@ export interface FetchOptions {
   token?: string; // explicit token to use
 }
 
-async function resolveToken(explicit?: string): Promise<string> {
+/**
+ * Exported so the GraphQL side resolves a token the same way: an
+ * explicit one, then the DB default, then GITHUB_TOKEN.
+ */
+export async function resolveToken(explicit?: string): Promise<string> {
   if (explicit) return explicit;
 
   // 1. DB default token
