@@ -15,6 +15,7 @@ import {
   upsertReleases,
   upsertReviews,
 } from "@/lib/db/upsert";
+import { encodeProjectError } from "@/lib/dependencies/project-error";
 import { getDecryptedToken } from "@/lib/tokens";
 import type {
   CollectionJob,
@@ -163,8 +164,8 @@ async function attachProjectFields(
   repo: string,
   token: string | undefined,
   since?: string,
-): Promise<boolean> {
-  if (issues.length === 0) return true;
+): Promise<{ current: boolean; error: string | null }> {
+  if (issues.length === 0) return { current: true, error: null };
 
   let fetched: Map<number, IssueProjectFields>;
   try {
@@ -178,12 +179,16 @@ async function attachProjectFields(
       await fetchProjectFieldDefs(owner, repo, bearer),
     );
   } catch (err) {
-    if (err instanceof ProjectsUnavailableError) {
-      console.warn(`[collector] Skipping project fields: ${err.message}`);
+    // Kept, not just logged. A refusal here is the difference between
+    // "press Update" and "your token cannot see Projects", and a server
+    // log is not somewhere the person looking at an empty column looks.
+    const denied = err instanceof ProjectsUnavailableError;
+    const message = err instanceof Error ? err.message : String(err);
+    const reason = encodeProjectError(denied ? "denied" : "failed", message);
+    if (denied) {
+      console.warn(`[collector] Skipping project fields: ${message}`);
     } else {
-      console.warn(
-        `[collector] Failed to read project fields: ${err instanceof Error ? err.message : err}`,
-      );
+      console.warn(`[collector] Failed to read project fields: ${message}`);
     }
     // Carry over what is already stored so a run that could not read
     // Projects does not blank fields it simply could not see.
@@ -198,7 +203,7 @@ async function attachProjectFields(
       issue.project_id = existing?.projectId ?? null;
       issue.project_item_id = existing?.projectItemId ?? null;
     }
-    return false;
+    return { current: false, error: reason };
   }
 
   // The fetch succeeded, so an issue missing from the result genuinely
@@ -222,7 +227,7 @@ async function attachProjectFields(
       `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
     );
   }
-  return true;
+  return { current: true, error: null };
 }
 
 /**
@@ -313,6 +318,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
     // Set by the project field sync below; only a run that actually read
     // Projects may stamp the marker.
     let projectFieldsCurrent = false;
+    let projectFieldsError: string | null = null;
     const issueSince =
       needsAssigneeBackfill || needsProjectFieldBackfill
         ? null
@@ -382,7 +388,7 @@ async function runCollection(job: CollectionJob): Promise<void> {
       await upsertReleases(conn, newReleases);
 
       job.progress = "Reading project fields...";
-      projectFieldsCurrent = await attachProjectFields(
+      const projectFieldResult = await attachProjectFields(
         conn,
         newIssues,
         owner,
@@ -390,6 +396,8 @@ async function runCollection(job: CollectionJob): Promise<void> {
         token,
         issueSince ?? undefined,
       );
+      projectFieldsCurrent = projectFieldResult.current;
+      projectFieldsError = projectFieldResult.error;
 
       await upsertIssues(conn, newIssues);
 
@@ -596,6 +604,9 @@ async function runCollection(job: CollectionJob): Promise<void> {
         projectFieldsCurrent
           ? (timestamps.projectFieldsSyncedAt ?? new Date().toISOString())
           : null,
+        // Cleared by a run that managed to read Projects, so a fixed
+        // token stops being accused of the problem it no longer has.
+        projectFieldsError,
       );
     } finally {
       conn.closeSync();

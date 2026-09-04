@@ -1,6 +1,7 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { getConnection, getRepositoryKeys } from "@/lib/db";
 import {
+  getIssuesProjectFieldsError,
   getIssuesProjectFieldsSyncedAt,
   listIssueDependencies,
   listIssueSubIssues,
@@ -256,6 +257,8 @@ export async function getIssueRelations(repoName: string): Promise<{
    * never managed to look", and the two need opposite advice.
    */
   projectFieldsSyncedAt: string | null;
+  /** Why the last run could not read Projects, or null if it could. */
+  projectFieldsError: string | null;
 }> {
   let conn: DuckDBConnection;
   try {
@@ -266,6 +269,7 @@ export async function getIssueRelations(repoName: string): Promise<{
       subIssues: [],
       projectFields: [],
       projectFieldsSyncedAt: null,
+      projectFieldsError: null,
     };
   }
   try {
@@ -274,6 +278,7 @@ export async function getIssueRelations(repoName: string): Promise<{
       subIssues: await listIssueSubIssues(conn),
       projectFields: await listProjectFields(conn),
       projectFieldsSyncedAt: await getIssuesProjectFieldsSyncedAt(conn),
+      projectFieldsError: await getIssuesProjectFieldsError(conn),
     };
   } finally {
     conn.closeSync();

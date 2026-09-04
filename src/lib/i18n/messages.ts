@@ -222,6 +222,8 @@ export type Messages = {
     clickToEdit: string;
     notOnBoard: string;
     projectsNotCollected: string;
+    projectsUnreadable: (reason: string) => string;
+    projectsFailed: (reason: string) => string;
     noProjectFields: string;
     noProjectFieldsFound: (names: string) => string;
     noAssignableUsers: string;
@@ -489,6 +491,10 @@ const en: Messages = {
       "This issue is not on a project board, so it has no Priority or Size to set.",
     projectsNotCollected:
       "Project fields have not been collected yet. Press Update — and check the token can read Projects.",
+    projectsUnreadable: (reason) =>
+      `GitHub refused to show Projects to this token, so Priority and Size cannot be read. A classic token needs the read:project scope; a fine-grained token needs Projects: Read-only, and for a board owned by an organisation, that permission on the organisation as well. GitHub said: ${reason}`,
+    projectsFailed: (reason) =>
+      `Reading Projects failed, so Priority and Size are unavailable. This is not a permissions problem — the request itself did not work, so it is worth reporting. GitHub said: ${reason}`,
     noProjectFields:
       "No project board on this repository has a Priority or Size field.",
     noProjectFieldsFound: (names) =>
@@ -800,6 +806,10 @@ const ja: Messages = {
       "\u3053\u306E Issue \u306F\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u8F09\u3063\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8A2D\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002",
     projectsNotCollected:
       "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u672A\u53D6\u5F97\u3067\u3059\u3002\u300C\u66F4\u65B0\u300D\u3092\u5B9F\u884C\u3057\u3001\u30C8\u30FC\u30AF\u30F3\u306B\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u3042\u308B\u304B\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+    projectsUnreadable: (reason) =>
+      `GitHub \u304C\u3053\u306E\u30C8\u30FC\u30AF\u30F3\u306B Projects \u3092\u898B\u305B\u3066\u3044\u307E\u305B\u3093\u3002\u305D\u306E\u305F\u3081\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002classic \u30C8\u30FC\u30AF\u30F3\u306B\u306F read:project \u30B9\u30B3\u30FC\u30D7\u3001fine-grained \u30C8\u30FC\u30AF\u30F3\u306B\u306F Projects: Read-only \u304C\u5FC5\u8981\u3067\u3059\u3002Organization \u6240\u6709\u306E\u30DC\u30FC\u30C9\u306E\u5834\u5408\u306F Organization \u5074\u306E\u6A29\u9650\u3082\u5FC5\u8981\u3067\u3059\u3002GitHub \u306E\u5FDC\u7B54: ${reason}`,
+    projectsFailed: (reason) =>
+      `Projects \u306E\u53D6\u5F97\u306B\u5931\u6557\u3057\u305F\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8868\u793A\u3067\u304D\u307E\u305B\u3093\u3002\u3053\u308C\u306F\u6A29\u9650\u306E\u554F\u984C\u3067\u306F\u306A\u304F\u3001\u30EA\u30AF\u30A8\u30B9\u30C8\u81EA\u4F53\u304C\u5931\u6557\u3057\u3066\u3044\u307E\u3059\u3002\u5831\u544A\u3057\u3066\u304F\u3060\u3055\u3044\u3002GitHub \u306E\u5FDC\u7B54: ${reason}`,
     noProjectFields:
       "\u3053\u306E\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
     noProjectFieldsFound: (names) =>

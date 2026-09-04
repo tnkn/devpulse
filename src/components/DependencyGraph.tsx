@@ -47,6 +47,7 @@ interface Props {
   subIssues: IssueSubIssueEdge[];
   projectFields: ProjectFieldDefinition[];
   projectFieldsSyncedAt: string | null;
+  projectFieldsError: string | null;
   /** Read from the query string on the server; see filter-params.ts. */
   initialFilters: DependencyFilters;
 }
@@ -64,6 +65,7 @@ export function DependencyGraph({
   subIssues,
   projectFields,
   projectFieldsSyncedAt,
+  projectFieldsError,
   initialFilters,
 }: Props) {
   const { t } = useI18n();
@@ -242,7 +244,11 @@ export function DependencyGraph({
 
   // Shown in both views: the cards carry Priority and Size too, so a
   // board nobody can read from is just as invisible on the graph.
-  const boardProblem = useBoardProblem(projectFields, projectFieldsSyncedAt);
+  const boardProblem = useBoardProblem(
+    projectFields,
+    projectFieldsSyncedAt,
+    projectFieldsError,
+  );
 
   const addDependency = useCallback(
     async (blockerNumber: number, blockedNumber: number): Promise<boolean> => {
@@ -507,6 +513,7 @@ export function DependencyGraph({
               repoKey={repoKey}
               projectFields={projectFields}
               projectFieldsSyncedAt={projectFieldsSyncedAt}
+              projectFieldsError={projectFieldsError}
               issues={issues}
               edges={edges}
               subIssues={subIssues}

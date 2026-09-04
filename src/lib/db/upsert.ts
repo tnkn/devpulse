@@ -267,6 +267,17 @@ export async function getIssueProjectItem(
 }
 
 /** When project fields were last fetched for every issue, or null. */
+/** The reason the last run could not read Projects, or null if it could. */
+export async function getIssuesProjectFieldsError(
+  conn: DuckDBConnection,
+): Promise<string | null> {
+  const reader = await conn.runAndReadAll(
+    "SELECT issues_project_fields_error FROM metadata LIMIT 1",
+  );
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
+}
+
 export async function getIssuesProjectFieldsSyncedAt(
   conn: DuckDBConnection,
 ): Promise<string | null> {
@@ -469,6 +480,7 @@ export async function upsertMetadata(
   issuesAssigneesSyncedAt?: string | null,
   issueRelationsSyncedAt?: string | null,
   issuesProjectFieldsSyncedAt?: string | null,
+  issuesProjectFieldsError?: string | null,
 ): Promise<void> {
   const reader = await conn.runAndReadAll(`
     SELECT
@@ -486,8 +498,8 @@ export async function upsertMetadata(
   // INSERT OR REPLACE rewrites the whole row, so every column that must
   // survive a collection run has to be listed here explicitly.
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id, issues_assignees_synced_at, issue_relations_synced_at, issues_project_fields_synced_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id, issues_assignees_synced_at, issue_relations_synced_at, issues_project_fields_synced_at, issues_project_fields_error)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
   );
   stmt.bindVarchar(1, fullName);
   stmt.bindVarchar(2, repositoryUrl);
@@ -515,6 +527,11 @@ export async function upsertMetadata(
     stmt.bindVarchar(11, issuesProjectFieldsSyncedAt);
   } else {
     stmt.bindNull(11);
+  }
+  if (issuesProjectFieldsError) {
+    stmt.bindVarchar(12, issuesProjectFieldsError);
+  } else {
+    stmt.bindNull(12);
   }
   await stmt.run();
   stmt.destroySync();
