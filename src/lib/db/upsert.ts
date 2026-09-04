@@ -3,6 +3,7 @@ import type {
   Commit,
   Issue,
   IssueDependencyEdge,
+  IssueProjectFields,
   IssueSubIssueEdge,
   PullRequest,
   Release,
@@ -100,8 +101,11 @@ export async function upsertIssues(
 ): Promise<void> {
   if (issues.length === 0) return;
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    // Project fields are listed here, not written by a later UPDATE:
+    // INSERT OR REPLACE rewrites the whole row, so a column left out
+    // would be blanked every time an issue is re-collected.
+    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id, priority, size)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
   );
   for (const i of issues) {
     stmt.bindInteger(1, i.number);
@@ -115,9 +119,51 @@ export async function upsertIssues(
     stmt.bindVarchar(8, JSON.stringify(i.assignees ?? []));
     if (i.id != null) stmt.bindBigInt(9, BigInt(i.id));
     else stmt.bindNull(9);
+    if (i.priority) stmt.bindVarchar(10, i.priority);
+    else stmt.bindNull(10);
+    if (i.size) stmt.bindVarchar(11, i.size);
+    else stmt.bindNull(11);
     await stmt.run();
   }
   stmt.destroySync();
+}
+
+/**
+ * Priority and Size already stored for the given issues.
+ *
+ * Used to carry them over when a collection run cannot reach Projects:
+ * the issue upsert rewrites the whole row, so without this a run with no
+ * project access would quietly blank fields it simply could not read.
+ */
+export async function getStoredProjectFields(
+  conn: DuckDBConnection,
+  issueNumbers: number[],
+): Promise<Map<number, IssueProjectFields>> {
+  const fields = new Map<number, IssueProjectFields>();
+  if (issueNumbers.length === 0) return fields;
+
+  const scope = issueNumbers.join(",");
+  const reader = await conn.runAndReadAll(
+    `SELECT number, priority, size FROM issues WHERE number IN (${scope})`,
+  );
+  for (const row of reader.getRows()) {
+    fields.set(Number(row[0]), {
+      priority: row[1] == null ? null : String(row[1]),
+      size: row[2] == null ? null : String(row[2]),
+    });
+  }
+  return fields;
+}
+
+/** When project fields were last fetched for every issue, or null. */
+export async function getIssuesProjectFieldsSyncedAt(
+  conn: DuckDBConnection,
+): Promise<string | null> {
+  const reader = await conn.runAndReadAll(
+    "SELECT issues_project_fields_synced_at FROM metadata LIMIT 1",
+  );
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
 }
 
 /** GitHub's global issue id for an issue number, or null if unknown. */
@@ -311,6 +357,7 @@ export async function upsertMetadata(
   tokenId?: string | null,
   issuesAssigneesSyncedAt?: string | null,
   issueRelationsSyncedAt?: string | null,
+  issuesProjectFieldsSyncedAt?: string | null,
 ): Promise<void> {
   const reader = await conn.runAndReadAll(`
     SELECT
@@ -328,8 +375,8 @@ export async function upsertMetadata(
   // INSERT OR REPLACE rewrites the whole row, so every column that must
   // survive a collection run has to be listed here explicitly.
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id, issues_assignees_synced_at, issue_relations_synced_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id, issues_assignees_synced_at, issue_relations_synced_at, issues_project_fields_synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
   );
   stmt.bindVarchar(1, fullName);
   stmt.bindVarchar(2, repositoryUrl);
@@ -352,6 +399,11 @@ export async function upsertMetadata(
     stmt.bindVarchar(10, issueRelationsSyncedAt);
   } else {
     stmt.bindNull(10);
+  }
+  if (issuesProjectFieldsSyncedAt) {
+    stmt.bindVarchar(11, issuesProjectFieldsSyncedAt);
+  } else {
+    stmt.bindNull(11);
   }
   await stmt.run();
   stmt.destroySync();

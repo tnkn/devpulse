@@ -5,6 +5,7 @@ import type {
   IssueSubIssueEdge,
 } from "@/types";
 import { getIssueProgressStatus } from "./graph";
+import { priorityOrder, sizeOrder } from "./priority";
 
 /** One issue's row: the same relationships the graph draws, listed. */
 export interface DependencyRow {
@@ -14,6 +15,8 @@ export interface DependencyRow {
   status: IssueProgressStatus;
   assignees: string[];
   labels: string[];
+  priority: string | null;
+  size: string | null;
   /** The sub-issue parent, when this issue has one and it is visible. */
   parent: { number: number; title: string } | null;
   /** Issues that must finish first, ascending. */
@@ -26,6 +29,8 @@ export type DependencySortKey =
   | "number"
   | "title"
   | "status"
+  | "priority"
+  | "size"
   | "assignees"
   | "parent"
   | "blockedBy"
@@ -94,6 +99,8 @@ export function buildDependencyRows(
       status: issue ? getIssueProgressStatus(issue) : "notstarted",
       assignees: issue?.assignees ?? [],
       labels: issue?.labels.map((l) => l.name) ?? [],
+      priority: issue?.priority ?? null,
+      size: issue?.size ?? null,
       parent:
         parentNumber === undefined
           ? null
@@ -122,6 +129,17 @@ export function sortDependencyRows(
         return a.title.localeCompare(b.title);
       case "status":
         return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      // By urgency and by magnitude, not alphabetically: "P10" after
+      // "P2", and 10 points after 2.
+      case "priority":
+        // Rank first, then the wording itself, so P0 comes above P1
+        // rather than the two sitting interleaved inside "high".
+        return (
+          priorityOrder(a.priority) - priorityOrder(b.priority) ||
+          (a.priority ?? "").localeCompare(b.priority ?? "")
+        );
+      case "size":
+        return sizeOrder(a.size) - sizeOrder(b.size);
       case "assignees":
         return a.assignees.join(",").localeCompare(b.assignees.join(","));
       case "parent":

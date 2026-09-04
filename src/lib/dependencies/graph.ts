@@ -130,6 +130,9 @@ export interface IssueGraphNode {
   url: string;
   assignees: string[];
   labels: string[];
+  /** Priority and Size as written on the issue's Projects v2 board. */
+  priority: string | null;
+  size: string | null;
   /** Id of the group node this issue is nested in, if it has a parent. */
   parentId?: string;
 }
@@ -147,6 +150,8 @@ export interface GroupGraphNode {
   title: string;
   status: IssueProgressStatus;
   url: string;
+  priority: string | null;
+  size: string | null;
   parentId?: string;
 }
 
@@ -321,6 +326,8 @@ export function buildDependencyGraph(
       url: `https://github.com/${repoFullName}/issues/${number}`,
       assignees: issue?.assignees ?? [],
       labels: issue?.labels.map((l) => l.name) ?? [],
+      priority: issue?.priority ?? null,
+      size: issue?.size ?? null,
     };
   };
 
@@ -345,7 +352,7 @@ export function buildDependencyGraph(
 
   const nodes: DependencyGraphNode[] = [];
   for (const number of groupNumbers) {
-    const { title, status, url } = describe(number);
+    const { title, status, url, priority, size } = describe(number);
     nodes.push({
       id: groupNodeId(number),
       kind: "group",
@@ -353,6 +360,8 @@ export function buildDependencyGraph(
       title,
       status,
       url,
+      priority,
+      size,
       ...(parentIdFor(number) ? { parentId: parentIdFor(number) } : {}),
     });
   }

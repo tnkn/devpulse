@@ -61,6 +61,19 @@ export interface Issue {
   closed_at: string | null;
   labels: { name: string }[];
   assignees?: string[];
+  /**
+   * Priority and Size as they read on the issue's GitHub Projects v2
+   * board. Absent when the issue is on no board, the board has neither
+   * field, or the token could not see projects when it was collected.
+   */
+  priority?: string | null;
+  size?: string | null;
+}
+
+/** The two project fields the graph shows, keyed off an issue. */
+export interface IssueProjectFields {
+  priority: string | null;
+  size: string | null;
 }
 
 /** Minimal identity of an issue returned by the relationship endpoints. */

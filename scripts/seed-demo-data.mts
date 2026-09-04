@@ -44,6 +44,42 @@ interface SeedIssue {
   assignees?: string[];
 }
 
+/**
+ * Stand-in for the Projects v2 Priority and Size fields.
+ *
+ * Deliberately mixed so the graph shows every case it has to handle:
+ * ranked wordings ("P1", "High"), story points, t-shirt sizes, a value
+ * the ranking does not recognise ("Someday"), and issues with neither.
+ */
+const SEED_PROJECT_FIELDS: Record<
+  number,
+  { priority?: string; size?: string }
+> = {
+  100: { priority: "P0", size: "XL" },
+  101: { priority: "P1", size: "M" },
+  102: { priority: "P1", size: "S" },
+  103: { priority: "P2", size: "M" },
+  104: { size: "S" },
+  105: { priority: "P0", size: "L" },
+  106: { priority: "P2", size: "S" },
+  107: { priority: "P3" },
+  108: { priority: "P1", size: "M" },
+  109: { priority: "P0", size: "XS" },
+  200: { priority: "High", size: "XL" },
+  201: { priority: "Medium", size: "S" },
+  202: { priority: "High", size: "M" },
+  203: { priority: "High", size: "8" },
+  204: { priority: "Medium", size: "5" },
+  205: { priority: "Low", size: "3" },
+  206: { priority: "Medium", size: "3" },
+  207: { size: "2" },
+  208: { priority: "High", size: "1" },
+  300: { priority: "P2", size: "L" },
+  301: { priority: "P2", size: "M" },
+  302: { priority: "P3", size: "S" },
+  401: { priority: "Someday" },
+};
+
 /** Cluster A: checkout revamp. Cluster B: payments. Cluster C: infra. */
 const SEED_ISSUES: SeedIssue[] = [
   // --- Epics: parents of the clusters below (sub-issue hierarchy) ---
@@ -305,6 +341,8 @@ async function main(): Promise<void> {
       state: seed.state,
       labels: seed.labels.map((name) => ({ name })),
       assignees: seed.assignees ?? [],
+      priority: SEED_PROJECT_FIELDS[seed.number]?.priority ?? null,
+      size: SEED_PROJECT_FIELDS[seed.number]?.size ?? null,
       ...timestampsFor(index, seed.state),
     }));
     await upsertIssues(conn, issues);
@@ -331,6 +369,7 @@ async function main(): Promise<void> {
       `${owner}/${repo}`,
       `https://github.com/${owner}/${repo}`,
       null,
+      now,
       now,
       now,
     );
