@@ -66,6 +66,8 @@ export async function migrateJsonToDb(
   await upsertIssues(conn, issues || []);
 
   if (metadata) {
+    // No assignee marker on purpose: JSON dumps predate assignee
+    // collection, so the next collection has to re-fetch every issue.
     await upsertMetadata(conn, metadata.repository, metadata.repository_url);
   }
 

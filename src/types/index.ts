@@ -52,12 +52,23 @@ export interface Release {
 
 export interface Issue {
   number: number;
+  /** GitHub's global issue id. Required by the issue dependencies API. */
+  id?: number;
   title: string;
   state: "open" | "closed";
   created_at: string;
   updated_at: string;
   closed_at: string | null;
   labels: { name: string }[];
+  assignees?: string[];
+}
+
+/** Minimal identity of an issue returned by the relationship endpoints. */
+export interface IssueRef {
+  id: number;
+  number: number;
+  /** "owner/repo" — relationships may point at another repository. */
+  repository: string;
 }
 
 export interface Review {
@@ -239,6 +250,21 @@ export interface TokenListResponse {
   allowTokenUI: boolean;
   hasEnvToken: boolean;
 }
+
+// Issue 依存関係グラフ型定義
+
+export interface IssueDependencyEdge {
+  blocker_number: number;
+  blocked_number: number;
+}
+
+/** Parent/child relationship from GitHub's sub-issues API. */
+export interface IssueSubIssueEdge {
+  parent_number: number;
+  child_number: number;
+}
+
+export type IssueProgressStatus = "notstarted" | "started" | "completed";
 
 // アプリケーション型定義
 

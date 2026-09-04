@@ -1,9 +1,12 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { getConnection, getRepositoryKeys } from "@/lib/db";
+import { listIssueDependencies, listIssueSubIssues } from "@/lib/db/upsert";
 import type {
   Commit,
   DumpMetadata,
   Issue,
+  IssueDependencyEdge,
+  IssueSubIssueEdge,
   PullRequest,
   Release,
   Repository,
@@ -96,7 +99,7 @@ export async function getRepoData(repoName: string): Promise<{
         "SELECT id, tag_name, name, created_at, published_at, prerelease, draft FROM releases ORDER BY published_at DESC",
       ),
       conn.runAndReadAll(
-        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json FROM issues ORDER BY number DESC",
+        "SELECT number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json FROM issues ORDER BY number DESC",
       ),
       conn.runAndReadAll(
         "SELECT id, pr_number, user_login, user_type, state, submitted_at FROM reviews ORDER BY submitted_at ASC",
@@ -182,6 +185,7 @@ export async function getRepoData(repoName: string): Promise<{
       updated_at: String(r[4]),
       closed_at: r[5] != null ? String(r[5]) : null,
       labels: parseLabelsJson(r[6]),
+      assignees: parseAssigneesJson(r[7]),
     }));
 
     // Parse reviews
@@ -216,5 +220,37 @@ function parseLabelsJson(value: unknown): { name: string }[] {
     return [];
   } catch {
     return [];
+  }
+}
+
+function parseAssigneesJson(value: unknown): string[] {
+  if (value == null) return [];
+  try {
+    const parsed = JSON.parse(String(value));
+    if (Array.isArray(parsed)) return parsed;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/** Issue relationships as last synced from GitHub. */
+export async function getIssueRelations(repoName: string): Promise<{
+  dependencies: IssueDependencyEdge[];
+  subIssues: IssueSubIssueEdge[];
+}> {
+  let conn: DuckDBConnection;
+  try {
+    conn = await getConnection(repoName);
+  } catch {
+    return { dependencies: [], subIssues: [] };
+  }
+  try {
+    return {
+      dependencies: await listIssueDependencies(conn),
+      subIssues: await listIssueSubIssues(conn),
+    };
+  } finally {
+    conn.closeSync();
   }
 }

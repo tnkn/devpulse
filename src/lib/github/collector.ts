@@ -1,5 +1,9 @@
+import type { DuckDBConnection } from "@duckdb/node-api";
 import { checkpoint, getConnection } from "@/lib/db";
 import {
+  getIssueRelationsSyncedAt,
+  getIssuesAssigneesSyncedAt,
+  replaceIssueRelations,
   updatePRSize,
   upsertCommits,
   upsertIssues,
@@ -9,15 +13,21 @@ import {
   upsertReviews,
 } from "@/lib/db/upsert";
 import { getDecryptedToken } from "@/lib/tokens";
-import type { CollectionJob } from "@/types";
+import type {
+  CollectionJob,
+  IssueDependencyEdge,
+  IssueSubIssueEdge,
+} from "@/types";
 import {
   getCommitCheckFailed,
   getCommits,
+  getIssueBlockedBy,
   getIssues,
   getPullRequestDetail,
   getPullRequestReviews,
   getPullRequests,
   getReleases,
+  getSubIssues,
 } from "./client";
 
 const globalJobs = globalThis as unknown as {
@@ -92,6 +102,8 @@ async function getLatestTimestamps(repoKey: string): Promise<{
   commitSince: string | null;
   prSince: string | null;
   issueSince: string | null;
+  assigneesSyncedAt: string | null;
+  relationsSyncedAt: string | null;
 }> {
   const conn = await getConnection(repoKey);
   try {
@@ -100,6 +112,7 @@ async function getLatestTimestamps(repoKey: string): Promise<{
       conn.runAndReadAll("SELECT MAX(updated_at) FROM pull_requests"),
       conn.runAndReadAll("SELECT MAX(updated_at) FROM issues"),
     ]);
+    const assigneesSyncedAt = await getIssuesAssigneesSyncedAt(conn);
 
     const commitRows = commitReader.getRows();
     const prRows = prReader.getRows();
@@ -109,10 +122,74 @@ async function getLatestTimestamps(repoKey: string): Promise<{
       commitSince: commitRows[0]?.[0] != null ? String(commitRows[0][0]) : null,
       prSince: prRows[0]?.[0] != null ? String(prRows[0][0]) : null,
       issueSince: issueRows[0]?.[0] != null ? String(issueRows[0][0]) : null,
+      assigneesSyncedAt,
+      relationsSyncedAt: await getIssueRelationsSyncedAt(conn),
     };
   } finally {
     conn.closeSync();
   }
+}
+
+/**
+ * Syncs "blocked by" dependencies and sub-issue hierarchy from GitHub,
+ * which owns both relationships. There is no bulk or GraphQL access to
+ * them, so this costs one request per issue per relationship; the caller
+ * limits which issues are visited.
+ */
+async function syncIssueRelations(
+  conn: DuckDBConnection,
+  owner: string,
+  repo: string,
+  issueNumbers: number[],
+  token: string | undefined,
+  onProgress: (done: number, total: number) => void,
+): Promise<{ skippedCrossRepo: number }> {
+  const repoFullName = `${owner}/${repo}`;
+  const dependencies: IssueDependencyEdge[] = [];
+  const subIssues: IssueSubIssueEdge[] = [];
+  let skippedCrossRepo = 0;
+  const BATCH_SIZE = 10;
+
+  for (let i = 0; i < issueNumbers.length; i += BATCH_SIZE) {
+    const batch = issueNumbers.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (number) => ({
+        number,
+        blockedBy: await getIssueBlockedBy(owner, repo, number, token),
+        children: await getSubIssues(owner, repo, number, token),
+      })),
+    );
+
+    for (const { number, blockedBy, children } of results) {
+      for (const ref of blockedBy) {
+        // The graph is scoped to one repository; relationships pointing
+        // elsewhere are counted and skipped rather than half-rendered.
+        if (ref.repository && ref.repository !== repoFullName) {
+          skippedCrossRepo++;
+          continue;
+        }
+        dependencies.push({
+          blocker_number: ref.number,
+          blocked_number: number,
+        });
+      }
+      for (const ref of children) {
+        if (ref.repository && ref.repository !== repoFullName) {
+          skippedCrossRepo++;
+          continue;
+        }
+        subIssues.push({ parent_number: number, child_number: ref.number });
+      }
+    }
+
+    onProgress(
+      Math.min(i + BATCH_SIZE, issueNumbers.length),
+      issueNumbers.length,
+    );
+  }
+
+  await replaceIssueRelations(conn, issueNumbers, dependencies, subIssues);
+  return { skippedCrossRepo };
 }
 
 async function runCollection(job: CollectionJob): Promise<void> {
@@ -128,18 +205,31 @@ async function runCollection(job: CollectionJob): Promise<void> {
     // Get latest timestamps for differential fetch
     job.progress = "Checking existing data...";
     const timestamps = await getLatestTimestamps(repoKey);
+
+    // Issues stored before assignees were collected would keep an empty
+    // assignee list forever, because `since` only returns issues updated
+    // after the last run. Re-fetch them all once, then go back to
+    // differential fetches.
+    const needsAssigneeBackfill = !timestamps.assigneesSyncedAt;
+    const issueSince = needsAssigneeBackfill ? null : timestamps.issueSince;
+
     const isDiff = !!(
       timestamps.commitSince ||
       timestamps.prSince ||
-      timestamps.issueSince
+      issueSince
     );
 
     if (isDiff) {
       console.log(
-        `[collector] Differential fetch for ${owner}/${repo} (commits since: ${timestamps.commitSince}, PRs since: ${timestamps.prSince}, issues since: ${timestamps.issueSince})`,
+        `[collector] Differential fetch for ${owner}/${repo} (commits since: ${timestamps.commitSince}, PRs since: ${timestamps.prSince}, issues since: ${issueSince})`,
       );
     } else {
       console.log(`[collector] Full fetch for ${owner}/${repo}`);
+    }
+    if (needsAssigneeBackfill && timestamps.issueSince) {
+      console.log(
+        `[collector] Re-fetching all issues for ${owner}/${repo} to backfill assignees`,
+      );
     }
 
     // Collect commits (supports `since`)
@@ -167,14 +257,14 @@ async function runCollection(job: CollectionJob): Promise<void> {
     const newReleases = await getReleases(owner, repo, token);
     console.log(`[collector] Fetched ${newReleases.length} releases`);
 
-    // Collect issues (supports `since`)
-    job.progress = "Collecting issues...";
+    // Collect issues (supports `since`, unless assignees need backfilling)
+    job.progress = needsAssigneeBackfill
+      ? "Collecting issues (backfilling assignees)..."
+      : "Collecting issues...";
     const newIssues = await getIssues(
       owner,
       repo,
-      timestamps.issueSince
-        ? { since: timestamps.issueSince, token }
-        : { token },
+      issueSince ? { since: issueSince, token } : { token },
     );
     console.log(`[collector] Fetched ${newIssues.length} issues`);
 
@@ -334,12 +424,56 @@ async function runCollection(job: CollectionJob): Promise<void> {
         );
       }
 
-      // Update metadata (with token_id)
+      // Sync issue relationships (GitHub owns them). A full pass on the
+      // first run, then only the issues touched by this run.
+      let relationsSyncedAt = timestamps.relationsSyncedAt;
+      try {
+        const relationScope = relationsSyncedAt
+          ? newIssues.map((i) => i.number)
+          : (
+              await conn.runAndReadAll(
+                "SELECT number FROM issues ORDER BY number",
+              )
+            )
+              .getRows()
+              .map((r) => Number(r[0]));
+
+        if (relationScope.length > 0) {
+          job.progress = `Syncing issue relationships (0/${relationScope.length})...`;
+          const { skippedCrossRepo } = await syncIssueRelations(
+            conn,
+            owner,
+            repo,
+            relationScope,
+            token,
+            (done, total) => {
+              job.progress = `Syncing issue relationships (${done}/${total})...`;
+            },
+          );
+          console.log(
+            `[collector] Synced relationships for ${relationScope.length} issues` +
+              (skippedCrossRepo > 0
+                ? ` (skipped ${skippedCrossRepo} cross-repository links)`
+                : ""),
+          );
+        }
+        relationsSyncedAt = relationsSyncedAt ?? new Date().toISOString();
+      } catch (relErr) {
+        // Leave the marker unset so the next run retries the full pass.
+        console.warn(
+          `[collector] Skipping issue relationship sync: ${relErr instanceof Error ? relErr.message : relErr}`,
+        );
+      }
+
+      // Update metadata (with token_id). The assignee marker is stamped
+      // once the run that fetched every issue has stored them.
       await upsertMetadata(
         conn,
         `${owner}/${repo}`,
         `https://github.com/${owner}/${repo}`,
         job.token_id,
+        timestamps.assigneesSyncedAt ?? new Date().toISOString(),
+        relationsSyncedAt,
       );
     } finally {
       conn.closeSync();

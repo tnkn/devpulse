@@ -1,16 +1,28 @@
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { migrateJsonToDb } from "./migrate-json";
-import { MIGRATION_DDL, SCHEMA_DDL } from "./schema";
+import { MIGRATION_DDL, SCHEMA_DDL, splitSqlStatements } from "./schema";
 
 const DATA_DIR = process.env.DATA_DIR || "./data";
 
 interface DbEntry {
   instance: DuckDBInstance;
   lastAccess: number;
+  /** Which revision of the DDL below was applied to this instance. */
+  schemaSignature: string;
 }
+
+// Instances are cached on globalThis, which survives a hot reload while
+// the DDL is reloaded with the new code. Stamping each cached instance
+// with the DDL it has seen lets a stale one be brought up to date
+// instead of failing on a table the running process expects to exist.
+const SCHEMA_SIGNATURE = createHash("sha1")
+  .update(SCHEMA_DDL)
+  .update(MIGRATION_DDL)
+  .digest("hex");
 
 const globalCache = globalThis as unknown as {
   __dev_vis_db_cache?: Map<string, DbEntry>;
@@ -52,19 +64,13 @@ function walPath(repoKey: string): string {
 }
 
 async function initSchema(conn: DuckDBConnection): Promise<void> {
-  const statements = SCHEMA_DDL.split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  for (const stmt of statements) {
+  for (const stmt of splitSqlStatements(SCHEMA_DDL)) {
     await conn.run(stmt);
   }
 }
 
 async function runMigrations(conn: DuckDBConnection): Promise<void> {
-  const statements = MIGRATION_DDL.split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  for (const stmt of statements) {
+  for (const stmt of splitSqlStatements(MIGRATION_DDL)) {
     try {
       await conn.run(stmt);
     } catch {
@@ -127,10 +133,28 @@ async function openInstance(
   return { instance, isNew: true }; // isNew=true triggers JSON migration
 }
 
+async function applySchema(instance: DuckDBInstance): Promise<void> {
+  const conn = await instance.connect();
+  try {
+    // CREATE TABLE / ADD COLUMN IF NOT EXISTS — safe to run always
+    await initSchema(conn);
+    await runMigrations(conn);
+  } finally {
+    conn.closeSync();
+  }
+}
+
 export async function getDb(repoKey: string): Promise<DuckDBInstance> {
   const existing = cache.get(repoKey);
   if (existing) {
     existing.lastAccess = Date.now();
+    // The cached instance may predate a schema change made since it was
+    // opened, which a long-running dev server keeps across reloads.
+    if (existing.schemaSignature !== SCHEMA_SIGNATURE) {
+      console.log(`[db] Schema changed, re-applying it to ${repoKey}`);
+      await applySchema(existing.instance);
+      existing.schemaSignature = SCHEMA_SIGNATURE;
+    }
     return existing.instance;
   }
 
@@ -150,7 +174,11 @@ export async function getDb(repoKey: string): Promise<DuckDBInstance> {
 
   conn.closeSync();
 
-  cache.set(repoKey, { instance, lastAccess: Date.now() });
+  cache.set(repoKey, {
+    instance,
+    lastAccess: Date.now(),
+    schemaSignature: SCHEMA_SIGNATURE,
+  });
 
   // Evict old entries if cache grows too large
   if (cache.size > 20) {
