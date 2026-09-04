@@ -28,6 +28,7 @@ interface Props {
   repoKey: string;
   projectFields: ProjectFieldDefinition[];
   projectFieldsSyncedAt: string | null;
+  projectFieldsError: string | null;
   issues: Issue[];
   edges: IssueDependencyEdge[];
   subIssues: IssueSubIssueEdge[];
@@ -110,6 +111,7 @@ export function DependencyTable({
   repoKey,
   projectFields,
   projectFieldsSyncedAt,
+  projectFieldsError,
   issues,
   edges,
   subIssues,
@@ -169,7 +171,11 @@ export function DependencyTable({
 
   // Announced above both views by DependencyGraph; still needed here to
   // decide whether an individual cell can be edited.
-  const boardProblem = useBoardProblem(projectFields, projectFieldsSyncedAt);
+  const boardProblem = useBoardProblem(
+    projectFields,
+    projectFieldsSyncedAt,
+    projectFieldsError,
+  );
 
   /**
    * Why one Priority or Size cell cannot be edited, or undefined when it

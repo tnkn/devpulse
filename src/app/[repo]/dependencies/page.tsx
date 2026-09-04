@@ -85,6 +85,7 @@ export default async function DependencyGraphPage({
           subIssues={relations.subIssues}
           projectFields={relations.projectFields}
           projectFieldsSyncedAt={relations.projectFieldsSyncedAt}
+          projectFieldsError={relations.projectFieldsError}
           initialFilters={filters}
         />
       </div>

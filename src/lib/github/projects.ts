@@ -13,7 +13,6 @@ const GITHUB_API = process.env.GITHUB_API_URL || "https://api.github.com";
 const ISSUES_PER_PAGE = 50;
 const PROJECTS_PER_REPO = 10;
 const FIELDS_PER_PROJECT = 50;
-const OPTIONS_PER_FIELD = 50;
 const PROJECT_ITEMS_PER_ISSUE = 5;
 const FIELD_VALUES_PER_ITEM = 20;
 const MAX_PAGES = 100;
@@ -243,7 +242,13 @@ query ProjectFieldDefs($owner: String!, $name: String!) {
             __typename
             ... on ProjectV2FieldCommon { id name dataType }
             ... on ProjectV2SingleSelectField {
-              options(first: ${OPTIONS_PER_FIELD}) { id name }
+              # No pagination argument here, unlike every other list in
+              # this file: options is [ProjectV2SingleSelectFieldOption!]!,
+              # a plain list rather than a connection, and its only
+              # argument is "names". Asking for (first:) is rejected
+              # outright, which fails the whole query and leaves Priority
+              # and Size unreadable.
+              options { id name }
             }
           }
         }

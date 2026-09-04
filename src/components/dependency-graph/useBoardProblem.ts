@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { decodeProjectError } from "@/lib/dependencies/project-error";
 import { useI18n } from "@/lib/i18n";
 import type { ProjectFieldDefinition } from "@/types";
 
@@ -22,9 +23,23 @@ import type { ProjectFieldDefinition } from "@/types";
 export function useBoardProblem(
   projectFields: ProjectFieldDefinition[],
   projectFieldsSyncedAt: string | null,
+  projectFieldsError: string | null,
 ): string | undefined {
   const { t } = useI18n();
   return useMemo(() => {
+    // A refusal outranks "not collected yet": both leave the timestamp
+    // unset, but only one of them is fixed by pressing Update, and
+    // telling someone to press a button they have already pressed is how
+    // this went unexplained for so long.
+    const failure = decodeProjectError(projectFieldsError);
+    if (failure) {
+      // Only a refusal earns the advice about token scopes. Our own bug
+      // wearing that message sends the reader to their token settings to
+      // fix something that was never wrong.
+      return failure.kind === "denied"
+        ? t.dependencies.projectsUnreadable(failure.message)
+        : t.dependencies.projectsFailed(failure.message);
+    }
     if (projectFieldsSyncedAt === null) {
       return t.dependencies.projectsNotCollected;
     }
@@ -35,5 +50,5 @@ export function useBoardProblem(
     return seen.length > 0
       ? t.dependencies.noProjectFieldsFound(seen.join(", "))
       : t.dependencies.noProjectFields;
-  }, [projectFields, projectFieldsSyncedAt, t]);
+  }, [projectFields, projectFieldsSyncedAt, projectFieldsError, t]);
 }

@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS metadata (
   token_id TEXT,
   issues_assignees_synced_at TEXT,
   issue_relations_synced_at TEXT,
-  issues_project_fields_synced_at TEXT
+  issues_project_fields_synced_at TEXT,
+  issues_project_fields_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS commits (
@@ -159,6 +160,10 @@ CREATE TABLE IF NOT EXISTS project_fields (
 -- outside the issue payload, so a differential run would never fill them
 -- in for issues collected before this existed.
 ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_synced_at TEXT;
+-- Why the last run could not read Projects, so the UI can say "the token
+-- cannot see Projects" instead of "not collected yet" — which reads as
+-- "you have not pressed Update" and sends people looking in the wrong place.
+ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_error TEXT;
 
 CREATE TABLE IF NOT EXISTS issue_sub_issues (
   parent_number INTEGER NOT NULL,
