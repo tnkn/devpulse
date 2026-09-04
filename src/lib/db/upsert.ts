@@ -1,5 +1,13 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
-import type { Commit, Issue, PullRequest, Release, Review } from "@/types";
+import type {
+  Commit,
+  Issue,
+  IssueDependencyEdge,
+  IssueSubIssueEdge,
+  PullRequest,
+  Release,
+  Review,
+} from "@/types";
 
 export async function upsertCommits(
   conn: DuckDBConnection,
@@ -92,8 +100,8 @@ export async function upsertIssues(
 ): Promise<void> {
   if (issues.length === 0) return;
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
   );
   for (const i of issues) {
     stmt.bindInteger(1, i.number);
@@ -104,9 +112,130 @@ export async function upsertIssues(
     if (i.closed_at) stmt.bindVarchar(6, i.closed_at);
     else stmt.bindNull(6);
     stmt.bindVarchar(7, JSON.stringify(i.labels));
+    stmt.bindVarchar(8, JSON.stringify(i.assignees ?? []));
+    if (i.id != null) stmt.bindBigInt(9, BigInt(i.id));
+    else stmt.bindNull(9);
     await stmt.run();
   }
   stmt.destroySync();
+}
+
+/** GitHub's global issue id for an issue number, or null if unknown. */
+export async function getIssueGlobalId(
+  conn: DuckDBConnection,
+  issueNumber: number,
+): Promise<number | null> {
+  const stmt = await conn.prepare(
+    "SELECT issue_id FROM issues WHERE number = $1",
+  );
+  stmt.bindInteger(1, issueNumber);
+  const reader = await stmt.runAndReadAll();
+  stmt.destroySync();
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? Number(rows[0][0]) : null;
+}
+
+export async function listIssueDependencies(
+  conn: DuckDBConnection,
+): Promise<IssueDependencyEdge[]> {
+  const reader = await conn.runAndReadAll(
+    "SELECT blocker_number, blocked_number FROM issue_dependencies ORDER BY blocker_number, blocked_number",
+  );
+  return reader.getRows().map((r) => ({
+    blocker_number: Number(r[0]),
+    blocked_number: Number(r[1]),
+  }));
+}
+
+export async function listIssueSubIssues(
+  conn: DuckDBConnection,
+): Promise<IssueSubIssueEdge[]> {
+  const reader = await conn.runAndReadAll(
+    "SELECT parent_number, child_number FROM issue_sub_issues ORDER BY parent_number, child_number",
+  );
+  return reader.getRows().map((r) => ({
+    parent_number: Number(r[0]),
+    child_number: Number(r[1]),
+  }));
+}
+
+/**
+ * Mirrors a locally-known dependency. GitHub owns this relationship, so
+ * callers must have written it there first; this only keeps the cache
+ * in step until the next collection re-syncs it.
+ */
+export async function cacheIssueDependency(
+  conn: DuckDBConnection,
+  blockerNumber: number,
+  blockedNumber: number,
+): Promise<void> {
+  const stmt = await conn.prepare(
+    "INSERT OR REPLACE INTO issue_dependencies (blocker_number, blocked_number) VALUES ($1, $2)",
+  );
+  stmt.bindInteger(1, blockerNumber);
+  stmt.bindInteger(2, blockedNumber);
+  await stmt.run();
+  stmt.destroySync();
+}
+
+export async function uncacheIssueDependency(
+  conn: DuckDBConnection,
+  blockerNumber: number,
+  blockedNumber: number,
+): Promise<void> {
+  const stmt = await conn.prepare(
+    "DELETE FROM issue_dependencies WHERE blocker_number = $1 AND blocked_number = $2",
+  );
+  stmt.bindInteger(1, blockerNumber);
+  stmt.bindInteger(2, blockedNumber);
+  await stmt.run();
+  stmt.destroySync();
+}
+
+/**
+ * Replaces the cached relationships for the given issues with what
+ * GitHub reported. Scoped to `syncedIssueNumbers` so a differential
+ * collection does not delete relationships of issues it did not look at.
+ */
+export async function replaceIssueRelations(
+  conn: DuckDBConnection,
+  syncedIssueNumbers: number[],
+  dependencies: IssueDependencyEdge[],
+  subIssues: IssueSubIssueEdge[],
+): Promise<void> {
+  if (syncedIssueNumbers.length === 0) return;
+  const scope = syncedIssueNumbers.join(",");
+
+  await conn.run(
+    `DELETE FROM issue_dependencies WHERE blocked_number IN (${scope})`,
+  );
+  await conn.run(
+    `DELETE FROM issue_sub_issues WHERE parent_number IN (${scope})`,
+  );
+
+  if (dependencies.length > 0) {
+    const stmt = await conn.prepare(
+      "INSERT OR REPLACE INTO issue_dependencies (blocker_number, blocked_number) VALUES ($1, $2)",
+    );
+    for (const edge of dependencies) {
+      stmt.bindInteger(1, edge.blocker_number);
+      stmt.bindInteger(2, edge.blocked_number);
+      await stmt.run();
+    }
+    stmt.destroySync();
+  }
+
+  if (subIssues.length > 0) {
+    const stmt = await conn.prepare(
+      "INSERT OR REPLACE INTO issue_sub_issues (parent_number, child_number) VALUES ($1, $2)",
+    );
+    for (const edge of subIssues) {
+      stmt.bindInteger(1, edge.parent_number);
+      stmt.bindInteger(2, edge.child_number);
+      await stmt.run();
+    }
+    stmt.destroySync();
+  }
 }
 
 export async function upsertReviews(
@@ -146,11 +275,42 @@ export async function updatePRSize(
   stmt.destroySync();
 }
 
+/**
+ * Reads the marker recording when issue assignees were last fully
+ * collected. NULL means the repository predates assignee collection, so
+ * the next run has to re-fetch every issue instead of only updated ones.
+ */
+export async function getIssuesAssigneesSyncedAt(
+  conn: DuckDBConnection,
+): Promise<string | null> {
+  const reader = await conn.runAndReadAll(
+    "SELECT issues_assignees_synced_at FROM metadata LIMIT 1",
+  );
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
+}
+
+/**
+ * Reads the marker recording when issue relationships were last fully
+ * synced from GitHub. NULL means no full pass has run yet.
+ */
+export async function getIssueRelationsSyncedAt(
+  conn: DuckDBConnection,
+): Promise<string | null> {
+  const reader = await conn.runAndReadAll(
+    "SELECT issue_relations_synced_at FROM metadata LIMIT 1",
+  );
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
+}
+
 export async function upsertMetadata(
   conn: DuckDBConnection,
   fullName: string,
   repositoryUrl: string,
   tokenId?: string | null,
+  issuesAssigneesSyncedAt?: string | null,
+  issueRelationsSyncedAt?: string | null,
 ): Promise<void> {
   const reader = await conn.runAndReadAll(`
     SELECT
@@ -165,9 +325,11 @@ export async function upsertMetadata(
   const rc = Number(rows[0][2]);
   const ic = Number(rows[0][3]);
 
+  // INSERT OR REPLACE rewrites the whole row, so every column that must
+  // survive a collection run has to be listed here explicitly.
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT OR REPLACE INTO metadata (full_name, repository_url, last_collected_at, commit_count, pull_request_count, release_count, issue_count, token_id, issues_assignees_synced_at, issue_relations_synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
   );
   stmt.bindVarchar(1, fullName);
   stmt.bindVarchar(2, repositoryUrl);
@@ -180,6 +342,16 @@ export async function upsertMetadata(
     stmt.bindVarchar(8, tokenId);
   } else {
     stmt.bindNull(8);
+  }
+  if (issuesAssigneesSyncedAt) {
+    stmt.bindVarchar(9, issuesAssigneesSyncedAt);
+  } else {
+    stmt.bindNull(9);
+  }
+  if (issueRelationsSyncedAt) {
+    stmt.bindVarchar(10, issueRelationsSyncedAt);
+  } else {
+    stmt.bindNull(10);
   }
   await stmt.run();
   stmt.destroySync();

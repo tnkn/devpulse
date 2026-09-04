@@ -40,6 +40,7 @@ export type Messages = {
     pullRequests: string;
     releases: string;
     issues: string;
+    dependencyGraph: string;
   };
   compare: {
     title: string;
@@ -198,6 +199,46 @@ export type Messages = {
     loc: string;
     noReviewData: string;
   };
+  dependencies: {
+    title: string;
+    description: string;
+    startPoint: string;
+    all: string;
+    byIssue: string;
+    filterIssues: string;
+    selectedCount: (count: number) => string;
+    clearSelection: string;
+    noMatchingIssues: string;
+    byLabel: string;
+    displayLimit: string;
+    layout: string;
+    layoutTopDown: string;
+    layoutLeftRight: string;
+    noLimit: string;
+    limitedTo: (shown: number, total: number) => string;
+    selectLabel: string;
+    graph: string;
+    noEdges: string;
+    legend: string;
+    notStarted: string;
+    started: string;
+    completed: string;
+    start: string;
+    finish: string;
+    selectStartPointHint: string;
+    dependencyEdge: string;
+    subIssueGroup: string;
+    blockingNow: string;
+    chainUpstream: string;
+    chainDownstream: string;
+    writePermissionRequired: string;
+    connectHint: string;
+    alreadyLinked: string;
+    cannotLinkToItself: string;
+    resetLayout: string;
+    expand: string;
+    exitExpand: string;
+  };
 };
 
 const en: Messages = {
@@ -240,6 +281,7 @@ const en: Messages = {
     pullRequests: "Pull Requests",
     releases: "Releases",
     issues: "Issues",
+    dependencyGraph: "Dependency Graph",
   },
   compare: {
     title: "Repository Comparison",
@@ -401,6 +443,50 @@ const en: Messages = {
     loc: "LOC",
     noReviewData: "No review data available",
   },
+  dependencies: {
+    title: "Issue Dependency Graph",
+    description:
+      "Visualize GitHub issue dependencies and sub-issue hierarchy. GitHub is the source of truth: adding or removing a dependency here writes it to GitHub, and the Update button re-syncs from it.",
+    startPoint: "Start point",
+    all: "All",
+    byIssue: "By issue",
+    filterIssues: "Filter by number or title",
+    selectedCount: (count) => `${count} selected`,
+    clearSelection: "Clear",
+    noMatchingIssues: "No matching issues",
+    byLabel: "By label / tag",
+    displayLimit: "Display limit",
+    layout: "Layout",
+    layoutTopDown: "Top to bottom",
+    layoutLeftRight: "Left to right",
+    noLimit: "No limit",
+    limitedTo: (shown, total) =>
+      `Showing ${shown} of ${total} issues. Raise the display limit to see the rest.`,
+    selectLabel: "Select a label...",
+    graph: "Graph",
+    noEdges: "No issues to display yet.",
+    legend: "Legend",
+    notStarted: "Not started",
+    started: "In progress",
+    completed: "Done",
+    start: "Start",
+    finish: "Finish",
+    selectStartPointHint: "Pick a start point to display its dependency graph.",
+    dependencyEdge: "Blocked by",
+    subIssueGroup: "Parent issue (contains sub-issues)",
+    blockingNow: "Still blocking",
+    chainUpstream: "Blocks the hovered issue",
+    chainDownstream: "Waiting on the hovered issue",
+    writePermissionRequired:
+      "GitHub rejected the change. The token needs Issues: Read and write permission on this repository.",
+    connectHint:
+      "Drag from one issue's outgoing handle to another's incoming handle to add a dependency. Select an arrow and press Delete to remove it. Cards can be dragged around; a reload restores the automatic layout.",
+    alreadyLinked: "That dependency already exists.",
+    cannotLinkToItself: "An issue cannot depend on itself.",
+    resetLayout: "Reset layout",
+    expand: "Full screen",
+    exitExpand: "Exit full screen (Esc)",
+  },
 };
 
 const ja: Messages = {
@@ -448,6 +534,7 @@ const ja: Messages = {
     pullRequests: "\u30D7\u30EB\u30EA\u30AF\u30A8\u30B9\u30C8",
     releases: "\u30EA\u30EA\u30FC\u30B9",
     issues: "\u30A4\u30B7\u30E5\u30FC",
+    dependencyGraph: "\u4F9D\u5B58\u95A2\u4FC2\u30B0\u30E9\u30D5",
   },
   compare: {
     title: "\u30EA\u30DD\u30B8\u30C8\u30EA\u6BD4\u8F03",
@@ -638,6 +725,58 @@ const ja: Messages = {
     loc: "LOC",
     noReviewData:
       "\u30EC\u30D3\u30E5\u30FC\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093",
+  },
+  dependencies: {
+    title: "Issue \u4F9D\u5B58\u95A2\u4FC2\u30B0\u30E9\u30D5",
+    description:
+      "GitHub \u306E Issue \u4F9D\u5B58\u95A2\u4FC2 (blocked by) \u3068\u89AA\u5B50\u95A2\u4FC2 (sub-issue) \u3092\u53EF\u8996\u5316\u3057\u307E\u3059\u3002GitHub \u304C\u6B63\u3068\u306A\u308A\u3001\u3053\u3053\u3067\u306E\u8FFD\u52A0\u30FB\u524A\u9664\u306F GitHub \u306B\u53CD\u6620\u3055\u308C\u3001\u300C\u66F4\u65B0\u300D\u30DC\u30BF\u30F3\u3067\u518D\u540C\u671F\u3055\u308C\u307E\u3059\u3002",
+    startPoint: "\u8D77\u70B9",
+    all: "\u3059\u3079\u3066",
+    byIssue: "Issue \u3067\u7D5E\u308A\u8FBC\u307F",
+    filterIssues:
+      "\u756A\u53F7\u30FB\u30BF\u30A4\u30C8\u30EB\u3067\u691C\u7D22",
+    selectedCount: (count) => `${count} \u4EF6\u9078\u629E\u4E2D`,
+    clearSelection: "\u30AF\u30EA\u30A2",
+    noMatchingIssues:
+      "\u8A72\u5F53\u3059\u308B Issue \u304C\u3042\u308A\u307E\u305B\u3093",
+    byLabel: "\u30E9\u30D9\u30EB / \u30BF\u30B0\u3067\u7D5E\u308A\u8FBC\u307F",
+    displayLimit: "\u8868\u793A\u4E0A\u9650",
+    layout: "\u30EC\u30A4\u30A2\u30A6\u30C8",
+    layoutTopDown: "\u4E0A\u304B\u3089\u4E0B",
+    layoutLeftRight: "\u5DE6\u304B\u3089\u53F3",
+    noLimit: "\u4E0A\u9650\u306A\u3057",
+    limitedTo: (shown, total) =>
+      `${total} \u4EF6\u4E2D ${shown} \u4EF6\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059\u3002\u3059\u3079\u3066\u898B\u308B\u306B\u306F\u8868\u793A\u4E0A\u9650\u3092\u4E0A\u3052\u3066\u304F\u3060\u3055\u3044\u3002`,
+    selectLabel: "\u30E9\u30D9\u30EB\u3092\u9078\u629E...",
+    graph: "\u30B0\u30E9\u30D5",
+    noEdges:
+      "\u8868\u793A\u3067\u304D\u308B Issue \u304C\u3042\u308A\u307E\u305B\u3093\u3002",
+    legend: "\u51E1\u4F8B",
+    notStarted: "\u672A\u7740\u624B",
+    started: "\u5BFE\u5FDC\u4E2D",
+    completed: "\u5B8C\u4E86",
+    start: "Start",
+    finish: "Finish",
+    selectStartPointHint:
+      "\u8D77\u70B9\u3092\u9078\u629E\u3059\u308B\u3068\u4F9D\u5B58\u95A2\u4FC2\u30B0\u30E9\u30D5\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002",
+    dependencyEdge: "\u4F9D\u5B58\u95A2\u4FC2 (blocked by)",
+    subIssueGroup:
+      "\u89AA Issue\uFF08\u30B5\u30D6\u30A4\u30B7\u30E5\u30FC\u3092\u542B\u3080\uFF09",
+    blockingNow: "\u30D6\u30ED\u30C3\u30AF\u4E2D",
+    chainUpstream:
+      "\u4E0A\u6D41\uFF08\u3053\u306E Issue \u3092\u6B62\u3081\u3066\u3044\u308B\uFF09",
+    chainDownstream: "\u4E0B\u6D41\uFF08\u3053\u306E Issue \u5F85\u3061\uFF09",
+    writePermissionRequired:
+      "GitHub \u306B\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002\u30C8\u30FC\u30AF\u30F3\u306B\u3053\u306E\u30EA\u30DD\u30B8\u30C8\u30EA\u306E Issues: Read and write \u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059\u3002",
+    connectHint:
+      "\u30CE\u30FC\u30C9\u306E\u51FA\u53E3\u5074\u306E\u25CF\u3092\u5225\u306E\u30CE\u30FC\u30C9\u306E\u5165\u53E3\u5074\u306E\u25CF\u306B\u30C9\u30E9\u30C3\u30B0\u3059\u308B\u3068\u4F9D\u5B58\u95A2\u4FC2\u3092\u8FFD\u52A0\u3002\u77E2\u5370\u3092\u9078\u629E\u3057\u3066 Delete \u30AD\u30FC\u3067\u524A\u9664\u3002\u30AB\u30FC\u30C9\u306F\u30C9\u30E9\u30C3\u30B0\u3067\u79FB\u52D5\u3067\u304D\u3001\u30EA\u30ED\u30FC\u30C9\u3067\u81EA\u52D5\u914D\u7F6E\u306B\u623B\u308A\u307E\u3059\u3002",
+    alreadyLinked:
+      "\u305D\u306E\u4F9D\u5B58\u95A2\u4FC2\u306F\u3059\u3067\u306B\u767B\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002",
+    cannotLinkToItself:
+      "\u540C\u3058 Issue \u540C\u58EB\u306F\u3064\u306A\u3052\u307E\u305B\u3093\u3002",
+    resetLayout: "\u914D\u7F6E\u3092\u30EA\u30BB\u30C3\u30C8",
+    expand: "\u5168\u753B\u9762\u8868\u793A",
+    exitExpand: "\u5168\u753B\u9762\u8868\u793A\u3092\u7D42\u4E86 (Esc)",
   },
 };
 

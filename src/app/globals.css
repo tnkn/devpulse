@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Dependency graph: nodes slide to their new places when the layout is
+ * re-ranked or reset. Done in CSS rather than by animating React state,
+ * which would re-render every card on every frame and drop a re-layout
+ * of a large graph to a handful of them.
+ *
+ * It is left on permanently rather than switched on around a re-layout:
+ * a dev-mode render can commit the new positions later than any such
+ * window would stay open. Dragging is excluded instead, so a card being
+ * moved still tracks the pointer exactly.
+ */
+.react-flow__node {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.react-flow__node.dragging,
+.react-flow__node.draggable.dragging {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node {
+    transition: none;
+  }
+}

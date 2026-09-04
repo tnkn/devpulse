@@ -3,13 +3,27 @@ import type {
   Commit,
   GitHubRepository,
   Issue,
+  IssueRef,
   PullRequest,
   Release,
   Review,
 } from "@/types";
 
-const GITHUB_API = "https://api.github.com";
+// Overridable so the app can point at GitHub Enterprise Server, and so
+// tests can run against a stub instead of the real API.
+const GITHUB_API = process.env.GITHUB_API_URL || "https://api.github.com";
 const MAX_PAGES = 100;
+
+/** Carries the HTTP status so callers can map it to a useful message. */
+export class GitHubApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "GitHubApiError";
+    this.status = status;
+  }
+}
 
 export interface FetchOptions {
   since?: string; // ISO 8601 timestamp
@@ -313,14 +327,18 @@ function mapPullRequest(pr: Record<string, unknown>): PullRequest {
 
 function mapIssue(i: Record<string, unknown>): Issue {
   const labels = i.labels as Array<Record<string, unknown>>;
+  const assigneesRaw =
+    (i.assignees as Array<Record<string, unknown>> | null) ?? [];
   return {
     number: i.number as number,
+    id: i.id as number,
     title: i.title as string,
     state: i.state as Issue["state"],
     created_at: i.created_at as string,
     updated_at: i.updated_at as string,
     closed_at: i.closed_at as string | null,
     labels: labels.map((l) => ({ name: l.name as string })),
+    assignees: assigneesRaw.map((a) => a.login as string).filter(Boolean),
   };
 }
 
@@ -450,6 +468,117 @@ export async function getPullRequestReviews(
       submitted_at: r.submitted_at as string,
     };
   });
+}
+
+function mapIssueRef(i: Record<string, unknown>): IssueRef {
+  // "https://api.github.com/repos/octocat/hello-world" -> "octocat/hello-world"
+  const repositoryUrl = (i.repository_url as string) ?? "";
+  const repository = repositoryUrl.split("/repos/")[1] ?? "";
+  return {
+    id: i.id as number,
+    number: i.number as number,
+    repository,
+  };
+}
+
+async function getIssueRelation(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  relation: "dependencies/blocked_by" | "dependencies/blocking" | "sub_issues",
+  token?: string,
+): Promise<IssueRef[]> {
+  const h = makeAuthHeaders(await resolveToken(token));
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${issueNumber}/${relation}?per_page=100`,
+    { headers: h },
+  );
+  if (!res.ok) {
+    throw new GitHubApiError(
+      res.status,
+      `GitHub API error: ${res.status} ${res.statusText}`,
+    );
+  }
+  const data = await res.json();
+  return (Array.isArray(data) ? data : []).map(mapIssueRef);
+}
+
+/** Issues that must be completed before `issueNumber` can proceed. */
+export async function getIssueBlockedBy(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  token?: string,
+): Promise<IssueRef[]> {
+  return getIssueRelation(
+    owner,
+    repo,
+    issueNumber,
+    "dependencies/blocked_by",
+    token,
+  );
+}
+
+/** Children of `issueNumber` in GitHub's sub-issue hierarchy. */
+export async function getSubIssues(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  token?: string,
+): Promise<IssueRef[]> {
+  return getIssueRelation(owner, repo, issueNumber, "sub_issues", token);
+}
+
+async function readErrorMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body && typeof body.message === "string") return body.message;
+  } catch {
+    // Fall through to the status text
+  }
+  return `${res.status} ${res.statusText}`;
+}
+
+/**
+ * Records that `blockedNumber` is blocked by the issue with the given
+ * global id. GitHub itself rejects cycles and self-dependencies (422).
+ */
+export async function addIssueBlockedBy(
+  owner: string,
+  repo: string,
+  blockedNumber: number,
+  blockerIssueId: number,
+  token?: string,
+): Promise<void> {
+  const h = makeAuthHeaders(await resolveToken(token));
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${blockedNumber}/dependencies/blocked_by`,
+    {
+      method: "POST",
+      headers: { ...h, "Content-Type": "application/json" },
+      body: JSON.stringify({ issue_id: blockerIssueId }),
+    },
+  );
+  if (!res.ok) {
+    throw new GitHubApiError(res.status, await readErrorMessage(res));
+  }
+}
+
+export async function removeIssueBlockedBy(
+  owner: string,
+  repo: string,
+  blockedNumber: number,
+  blockerIssueId: number,
+  token?: string,
+): Promise<void> {
+  const h = makeAuthHeaders(await resolveToken(token));
+  const res = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/issues/${blockedNumber}/dependencies/blocked_by/${blockerIssueId}`,
+    { method: "DELETE", headers: h },
+  );
+  if (!res.ok) {
+    throw new GitHubApiError(res.status, await readErrorMessage(res));
+  }
 }
 
 export async function getIssues(

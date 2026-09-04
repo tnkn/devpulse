@@ -53,6 +53,12 @@ export default async function MetricsDashboardPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold">{data.metadata.repository}</h1>
           <div className="flex items-center gap-2">
             <LocaleToggle />
+            <Link
+              href={`/${repo}/dependencies`}
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {t.repo.dependencyGraph}
+            </Link>
             <UpdateButton
               owner={data.metadata.repository.split("/")[0]}
               repo={data.metadata.repository.split("/")[1]}

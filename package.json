@@ -9,10 +9,13 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:demo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-demo-data.mts"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@duckdb/node-api": "1.4.4-r.4",
+    "@xyflow/react": "^12.11.6",
     "next": "16.2.12",
     "react": "19.2.8",
     "react-dom": "19.2.8",
