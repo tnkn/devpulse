@@ -20,12 +20,18 @@ const MAX_PAGES = 100;
 
 /**
  * Field names are matched rather than hard-coded to "Priority" and
- * "Size": those are only the defaults of GitHub's project templates, and
- * a board that renamed Size to "Estimate" or "Story points" is saying
- * the same thing.
+ * "Size": those are only the defaults of GitHub's project templates.
+ *
+ * Matched on containment rather than equality, because boards rename
+ * these constantly — "Priority Level", "Prio", "優先度", "🔥 Priority",
+ * "Size (t-shirt)" — and an exact match reads none of them, silently.
+ * The cost of being generous is a field called something like "Sizing
+ * notes" being picked up; the cost of being strict is the feature
+ * appearing broken with no way to tell why, which is far worse.
  */
-const PRIORITY_FIELD = /^priority$/i;
-const SIZE_FIELD = /^(size|estimate|story\s*points?|points?|sp)$/i;
+const PRIORITY_FIELD = /priority|prio\b|優先/i;
+const SIZE_FIELD =
+  /size|estimate|story\s*points?|\bpoints?\b|\bsp\b|見積|サイズ|規模/i;
 
 /**
  * Reads Priority and Size off the Projects v2 items an issue belongs to.
@@ -288,16 +294,20 @@ export async function fetchProjectFieldDefs(
   );
 
   const definitions: ProjectFieldDefinition[] = [];
+  const seen: string[] = [];
   for (const project of body.data?.repository?.projectsV2.nodes ?? []) {
     if (!project) continue;
     for (const field of project.fields.nodes) {
       if (!field?.id || !field.name) continue;
+      seen.push(`${project.title}/${field.name}`);
+      // Unmatched fields are kept too, marked "other": the board's real
+      // field names are the only way to see a naming mismatch, and a
+      // server log is not somewhere the reader can look.
       const kind = PRIORITY_FIELD.test(field.name)
         ? "priority"
         : SIZE_FIELD.test(field.name)
           ? "size"
-          : null;
-      if (!kind) continue;
+          : "other";
       definitions.push({
         projectId: project.id,
         projectTitle: project.title,
@@ -308,6 +318,21 @@ export async function fetchProjectFieldDefs(
         options: field.options ?? [],
       });
     }
+  }
+
+  // A board whose fields are all named something else is the case that
+  // looks like a bug from the outside, so it says what it did find.
+  const matched = definitions.filter((d) => d.kind !== "other");
+  if (matched.length === 0) {
+    console.warn(
+      seen.length === 0
+        ? "[projects] No Projects v2 board is linked to this repository."
+        : `[projects] No field looked like Priority or Size. Fields on the linked boards: ${seen.join(", ")}`,
+    );
+  } else {
+    console.log(
+      `[projects] Editable fields: ${matched.map((d) => `${d.projectTitle}/${d.fieldName} (${d.kind})`).join(", ")}`,
+    );
   }
   return definitions;
 }

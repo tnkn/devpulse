@@ -95,8 +95,12 @@ export interface ProjectFieldDefinition {
   projectTitle: string;
   fieldId: string;
   fieldName: string;
-  /** Which of the two the field name was recognised as. */
-  kind: "priority" | "size";
+  /**
+   * Which of the two the field name was recognised as, or "other" for a
+   * field kept only so the reader can see what the board actually calls
+   * things when nothing matched.
+   */
+  kind: "priority" | "size" | "other";
   /** GitHub's ProjectV2FieldType: SINGLE_SELECT, NUMBER, TEXT, ... */
   dataType: string;
   /** Empty unless the field is a single select. */

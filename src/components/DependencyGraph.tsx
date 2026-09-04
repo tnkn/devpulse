@@ -41,6 +41,7 @@ interface Props {
   initialEdges: IssueDependencyEdge[];
   subIssues: IssueSubIssueEdge[];
   projectFields: ProjectFieldDefinition[];
+  projectFieldsSyncedAt: string | null;
 }
 
 type ViewMode = "graph" | "table";
@@ -55,6 +56,7 @@ export function DependencyGraph({
   initialEdges,
   subIssues,
   projectFields,
+  projectFieldsSyncedAt,
 }: Props) {
   const { t } = useI18n();
   const [edges, setEdges] = useState<IssueDependencyEdge[]>(initialEdges);
@@ -464,6 +466,7 @@ export function DependencyGraph({
             <DependencyTable
               repoKey={repoKey}
               projectFields={projectFields}
+              projectFieldsSyncedAt={projectFieldsSyncedAt}
               issues={issues}
               edges={edges}
               subIssues={subIssues}

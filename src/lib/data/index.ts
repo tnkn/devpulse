@@ -1,6 +1,7 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
 import { getConnection, getRepositoryKeys } from "@/lib/db";
 import {
+  getIssuesProjectFieldsSyncedAt,
   listIssueDependencies,
   listIssueSubIssues,
   listProjectFields,
@@ -249,18 +250,30 @@ export async function getIssueRelations(repoName: string): Promise<{
   subIssues: IssueSubIssueEdge[];
   /** The editable board fields, so a cell knows what it may offer. */
   projectFields: ProjectFieldDefinition[];
+  /**
+   * When Projects was last read successfully, or null if it never was.
+   * Without this, "no board fields" cannot be told apart from "we have
+   * never managed to look", and the two need opposite advice.
+   */
+  projectFieldsSyncedAt: string | null;
 }> {
   let conn: DuckDBConnection;
   try {
     conn = await getConnection(repoName);
   } catch {
-    return { dependencies: [], subIssues: [], projectFields: [] };
+    return {
+      dependencies: [],
+      subIssues: [],
+      projectFields: [],
+      projectFieldsSyncedAt: null,
+    };
   }
   try {
     return {
       dependencies: await listIssueDependencies(conn),
       subIssues: await listIssueSubIssues(conn),
       projectFields: await listProjectFields(conn),
+      projectFieldsSyncedAt: await getIssuesProjectFieldsSyncedAt(conn),
     };
   } finally {
     conn.closeSync();
