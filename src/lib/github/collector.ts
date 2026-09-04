@@ -211,9 +211,17 @@ async function attachProjectFields(
     issue.project_id = fields?.projectId ?? null;
     issue.project_item_id = fields?.projectItemId ?? null;
   }
-  console.log(
-    `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
-  );
+  if (fetched.size === 0) {
+    // Reached GitHub, understood the answer, and it was "nothing" — which
+    // looks identical to a broken feature unless it says so.
+    console.warn(
+      `[collector] Projects returned no Priority or Size for any of ${issues.length} issues. The issues may not be on a board, or the board's fields are named something unrecognised (see the [projects] line above).`,
+    );
+  } else {
+    console.log(
+      `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
+    );
+  }
   return true;
 }
 

@@ -221,7 +221,14 @@ export type Messages = {
     colParent: string;
     clickToEdit: string;
     notOnBoard: string;
+    projectsNotCollected: string;
+    noProjectFields: string;
+    noProjectFieldsFound: (names: string) => string;
     noAssignableUsers: string;
+    filterUsers: string;
+    recentlyUsed: string;
+    noMatchingUsers: string;
+    userCount: (shown: number, total: number) => string;
     colPriority: string;
     colSize: string;
     colBlockedBy: string;
@@ -480,8 +487,19 @@ const en: Messages = {
     clickToEdit: "Click to edit",
     notOnBoard:
       "This issue is not on a project board, so it has no Priority or Size to set.",
+    projectsNotCollected:
+      "Project fields have not been collected yet. Press Update — and check the token can read Projects.",
+    noProjectFields:
+      "No project board on this repository has a Priority or Size field.",
+    noProjectFieldsFound: (names) =>
+      `No field looked like Priority or Size. The board has: ${names}. Rename one on GitHub, or tell us which to use.`,
     noAssignableUsers:
       "No assignable users. The token needs read access to the repository's collaborators.",
+    filterUsers: "Filter users",
+    recentlyUsed: "Recently used",
+    noMatchingUsers: "No matching users",
+    userCount: (shown, total) =>
+      shown === total ? `${total} users` : `${shown} of ${total} users`,
     colPriority: "Priority",
     colSize: "Size",
     colBlockedBy: "Blocked by",
@@ -780,8 +798,22 @@ const ja: Messages = {
     clickToEdit: "\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u7DE8\u96C6",
     notOnBoard:
       "\u3053\u306E Issue \u306F\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u8F09\u3063\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8A2D\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002",
+    projectsNotCollected:
+      "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u672A\u53D6\u5F97\u3067\u3059\u3002\u300C\u66F4\u65B0\u300D\u3092\u5B9F\u884C\u3057\u3001\u30C8\u30FC\u30AF\u30F3\u306B\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u3042\u308B\u304B\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+    noProjectFields:
+      "\u3053\u306E\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u3042\u308A\u307E\u305B\u3093\u3002",
+    noProjectFieldsFound: (names) =>
+      `\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3089\u3057\u304D\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u30DC\u30FC\u30C9\u306E\u30D5\u30A3\u30FC\u30EB\u30C9: ${names}`,
     noAssignableUsers:
       "\u5272\u308A\u5F53\u3066\u53EF\u80FD\u306A\u30E6\u30FC\u30B6\u30FC\u304C\u3044\u307E\u305B\u3093\u3002\u30C8\u30FC\u30AF\u30F3\u306B\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u30B3\u30E9\u30DC\u30EC\u30FC\u30BF\u30FC\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u5FC5\u8981\u3067\u3059\u3002",
+    filterUsers: "\u30E6\u30FC\u30B6\u30FC\u3092\u7D5E\u308A\u8FBC\u307F",
+    recentlyUsed: "\u6700\u8FD1\u4F7F\u3063\u305F",
+    noMatchingUsers:
+      "\u8A72\u5F53\u3059\u308B\u30E6\u30FC\u30B6\u30FC\u304C\u3044\u307E\u305B\u3093",
+    userCount: (shown, total) =>
+      shown === total
+        ? `${total} \u4EBA`
+        : `${total} \u4EBA\u4E2D ${shown} \u4EBA`,
     colPriority: "\u512A\u5148\u5EA6",
     colSize: "\u30B5\u30A4\u30BA",
     colBlockedBy: "\u30D6\u30ED\u30C3\u30AF\u5143",

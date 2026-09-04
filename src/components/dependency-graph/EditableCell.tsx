@@ -104,15 +104,58 @@ export function EditableCell({
 }
 
 /**
+ * Names picked most recently, newest first, per repository.
+ *
+ * A team assigns the same handful of people over and over, and on a
+ * repository with hundreds of collaborators those few are otherwise
+ * buried in an alphabetical list. Kept in localStorage because it is a
+ * convenience for one person on one machine, not shared state.
+ */
+const RECENT_LIMIT = 5;
+
+function recentKey(repoKey: string) {
+  return `dev-vis:recent-assignees:${repoKey}`;
+}
+
+function readRecent(repoKey: string): string[] {
+  try {
+    const raw = localStorage.getItem(recentKey(repoKey));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((v): v is string => typeof v === "string")
+      : [];
+  } catch {
+    // A private window, cleared storage, or a browser refusing access:
+    // the picker still works, it just has no memory.
+    return [];
+  }
+}
+
+function rememberRecent(repoKey: string, login: string): string[] {
+  const next = [login, ...readRecent(repoKey).filter((l) => l !== login)].slice(
+    0,
+    RECENT_LIMIT,
+  );
+  try {
+    localStorage.setItem(recentKey(repoKey), JSON.stringify(next));
+  } catch {
+    // Not being able to remember is not a reason to fail the edit.
+  }
+  return next;
+}
+
+/**
  * The assignee cell: a checklist rather than a single choice, because an
  * issue may have several and GitHub takes the whole set at once.
  */
 export function AssigneeCell({
+  repoKey,
   assignees,
   candidates,
   disabledReason,
   onChange,
 }: {
+  repoKey: string;
   assignees: string[];
   candidates: string[];
   disabledReason?: string;
@@ -121,7 +164,15 @@ export function AssigneeCell({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // Read on open rather than on mount: the list is shared by every row,
+  // so a pick in one cell has to be visible in the next one opened.
+  useEffect(() => {
+    if (open) setRecent(readRecent(repoKey));
+  }, [open, repoKey]);
 
   // Closed by a press outside rather than by blur: ticking a name inside
   // the list blurs the trigger, which would shut it on the first pick.
@@ -157,9 +208,13 @@ export function AssigneeCell({
   }
 
   const toggle = async (login: string) => {
-    const next = assignees.includes(login)
-      ? assignees.filter((a) => a !== login)
-      : [...assignees, login];
+    const adding = !assignees.includes(login);
+    const next = adding
+      ? [...assignees, login]
+      : assignees.filter((a) => a !== login);
+    // Only assigning counts as "using" a name; unassigning someone is
+    // not a reason to offer them first next time.
+    if (adding) setRecent(rememberRecent(repoKey, login));
     setSaving(true);
     try {
       await onChange(next);
@@ -167,6 +222,28 @@ export function AssigneeCell({
       setSaving(false);
     }
   };
+
+  const filtered = candidates.filter((login) =>
+    login.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  // Recent names are lifted to the top rather than duplicated, so a name
+  // never appears twice and the count below still means what it says.
+  const recentShown = recent.filter((login) => filtered.includes(login));
+  const rest = filtered.filter((login) => !recentShown.includes(login));
+
+  const row = (login: string) => (
+    <label
+      key={login}
+      className="flex cursor-pointer items-center gap-2 py-0.5 text-sm"
+    >
+      <input
+        type="checkbox"
+        checked={assignees.includes(login)}
+        onChange={() => void toggle(login)}
+      />
+      <span className="truncate">{login}</span>
+    </label>
+  );
 
   return (
     <div ref={boxRef} className="relative">
@@ -180,25 +257,47 @@ export function AssigneeCell({
         {label}
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-30 mt-1 max-h-56 w-56 overflow-y-auto rounded border border-gray-300 bg-white px-2 py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+        <div className="absolute top-full left-0 z-30 mt-1 w-64 rounded border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800">
           {candidates.length === 0 ? (
-            <p className="py-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="px-2 py-2 text-xs text-gray-500 dark:text-gray-400">
               {t.dependencies.noAssignableUsers}
             </p>
           ) : (
-            candidates.map((login) => (
-              <label
-                key={login}
-                className="flex cursor-pointer items-center gap-2 py-0.5 text-sm"
-              >
+            <>
+              <div className="border-b border-gray-200 p-1.5 dark:border-gray-700">
                 <input
-                  type="checkbox"
-                  checked={assignees.includes(login)}
-                  onChange={() => void toggle(login)}
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t.dependencies.filterUsers}
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
                 />
-                <span className="truncate">{login}</span>
-              </label>
-            ))
+              </div>
+              {/* Scrolls rather than truncates: every collaborator has to
+                  be reachable, however many there are. */}
+              <div className="max-h-64 overflow-y-auto px-2 py-1">
+                {recentShown.length > 0 && (
+                  <>
+                    <p className="py-0.5 text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                      {t.dependencies.recentlyUsed}
+                    </p>
+                    {recentShown.map(row)}
+                    {rest.length > 0 && (
+                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                    )}
+                  </>
+                )}
+                {rest.map(row)}
+                {filtered.length === 0 && (
+                  <p className="py-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t.dependencies.noMatchingUsers}
+                  </p>
+                )}
+              </div>
+              <p className="border-t border-gray-200 px-2 py-1 text-[10px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                {t.dependencies.userCount(filtered.length, candidates.length)}
+              </p>
+            </>
           )}
         </div>
       )}

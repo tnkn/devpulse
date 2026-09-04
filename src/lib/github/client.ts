@@ -637,14 +637,20 @@ export async function getAssignableUsers(
   repo: string,
   token?: string,
 ): Promise<string[]> {
+  // No page cap beyond the default: a 300-user ceiling silently omitted
+  // people from a large repository, and an assignee picker missing names
+  // is worse than a slightly longer request.
   const raw = await fetchAllPages<{ login?: string }>(
     `${GITHUB_API}/repos/${owner}/${repo}/assignees?per_page=100`,
     token,
-    3,
   );
-  return raw
+  const logins = raw
     .map((u) => u.login)
     .filter((login): login is string => Boolean(login));
+  console.log(
+    `[github] ${logins.length} assignable users for ${owner}/${repo}`,
+  );
+  return logins;
 }
 
 export async function getIssues(
