@@ -6,7 +6,10 @@ import {
   AssigneeCell,
   EditableCell,
 } from "@/components/dependency-graph/EditableCell";
-import { useBoardProblem } from "@/components/dependency-graph/useBoardProblem";
+import {
+  type ProjectFieldKind,
+  useBoardProblem,
+} from "@/components/dependency-graph/useBoardProblem";
 import { priorityRank } from "@/lib/dependencies/priority";
 import {
   buildDependencyRows,
@@ -179,13 +182,21 @@ export function DependencyTable({
 
   /**
    * Why one Priority or Size cell cannot be edited, or undefined when it
-   * can. Beyond the repository-wide causes there is a per-issue one —
-   * this issue is on no board — which stays on the cell, because it is
-   * true of that row and not of its neighbours.
+   * can.
+   *
+   * Answered per kind, not per table. A board that names its Priority
+   * something we do not recognise still has a perfectly good Size, and
+   * locking the Size column over the Priority column's problem would
+   * take away an edit that works.
+   *
+   * Beyond the board-wide causes there is a per-issue one — this issue
+   * is on no board — which stays on the cell, because it is true of that
+   * row and not of its neighbours.
    */
   const uneditableReason = useCallback(
-    (projectItemId: string | null): string | undefined => {
-      if (boardProblem) return boardProblem;
+    (kind: ProjectFieldKind, projectItemId: string | null) => {
+      if (boardProblem.blocked) return boardProblem.notice;
+      if (boardProblem.missing.has(kind)) return boardProblem.notice;
       if (!projectItemId) return t.dependencies.notOnBoard;
       return undefined;
     },
@@ -338,7 +349,10 @@ export function DependencyTable({
                   <EditableCell
                     value={row.priority}
                     options={optionsFor("priority", row.projectId)}
-                    disabledReason={uneditableReason(row.projectItemId)}
+                    disabledReason={uneditableReason(
+                      "priority",
+                      row.projectItemId,
+                    )}
                     onChange={(next) =>
                       submit({
                         issue_number: row.number,
@@ -364,7 +378,7 @@ export function DependencyTable({
                   <EditableCell
                     value={row.size}
                     options={optionsFor("size", row.projectId)}
-                    disabledReason={uneditableReason(row.projectItemId)}
+                    disabledReason={uneditableReason("size", row.projectItemId)}
                     onChange={(next) =>
                       submit({
                         issue_number: row.number,
