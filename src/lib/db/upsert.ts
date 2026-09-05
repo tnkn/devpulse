@@ -233,6 +233,47 @@ export async function listProjectFields(
  * move, and the issue's other columns are not ours to restate here.
  * Called only after GitHub has taken the change.
  */
+/**
+ * Writes Priority, Size and the ids they are edited through, for issues
+ * already stored.
+ *
+ * Separate from the issue upsert because these are refreshed for *every*
+ * issue on every run, not only the ones a differential fetch returned:
+ * they live outside the issue payload, so changing one on GitHub need
+ * not move the issue's updatedAt, and a differential run would never
+ * look at it again.
+ */
+export async function refreshIssueFields(
+  conn: DuckDBConnection,
+  rows: {
+    number: number;
+    priority: string | null;
+    size: string | null;
+    projectId: string | null;
+    projectItemId: string | null;
+    nodeId: string | null;
+  }[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const stmt = await conn.prepare(
+    `UPDATE issues SET priority = $2, size = $3, project_id = $4,
+       project_item_id = $5, issue_node_id = COALESCE($6, issue_node_id)
+     WHERE number = $1`,
+  );
+  for (const row of rows) {
+    stmt.bindInteger(1, row.number);
+    const bind = (i: number, v: string | null) =>
+      v == null ? stmt.bindNull(i) : stmt.bindVarchar(i, v);
+    bind(2, row.priority);
+    bind(3, row.size);
+    bind(4, row.projectId);
+    bind(5, row.projectItemId);
+    bind(6, row.nodeId);
+    await stmt.run();
+  }
+  stmt.destroySync();
+}
+
 export async function setIssueFieldsLocally(
   conn: DuckDBConnection,
   issueNumber: number,

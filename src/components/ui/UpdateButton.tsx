@@ -20,6 +20,13 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
     tokenId || "env",
   );
   const [hasEnvToken, setHasEnvToken] = useState(false);
+  // "auto" carries on from the last run and is what almost every update
+  // wants. The wider settings exist for the moment something looks
+  // wrong: Priority and Size can change on GitHub without moving an
+  // issue's updatedAt, so only a wider window will notice.
+  const [scope, setScope] = useState<"auto" | "7" | "30" | "90" | "all">(
+    "auto",
+  );
 
   const isRunning =
     job && (job.status === "pending" || job.status === "collecting");
@@ -49,6 +56,15 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
           owner,
           repo,
           token_id: selectedTokenId,
+          ...(scope === "all"
+            ? { full: true }
+            : scope === "auto"
+              ? {}
+              : {
+                  since: new Date(
+                    Date.now() - Number(scope) * 24 * 60 * 60 * 1000,
+                  ).toISOString(),
+                }),
         }),
       });
       const data = await res.json();
@@ -57,7 +73,7 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
     } catch {
       setJob(null);
     }
-  }, [owner, repo, selectedTokenId]);
+  }, [owner, repo, selectedTokenId, scope]);
 
   // Poll job status
   useEffect(() => {
@@ -150,6 +166,20 @@ export function UpdateButton({ owner, repo, tokenId }: Props) {
           ))}
         </select>
       )}
+      <select
+        value={scope}
+        onChange={(e) =>
+          setScope(e.target.value as "auto" | "7" | "30" | "90" | "all")
+        }
+        title={t.updateButton.scopeHint}
+        className="px-2 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+      >
+        <option value="auto">{t.updateButton.scopeAuto}</option>
+        <option value="7">{t.updateButton.scopeDays(7)}</option>
+        <option value="30">{t.updateButton.scopeDays(30)}</option>
+        <option value="90">{t.updateButton.scopeDays(90)}</option>
+        <option value="all">{t.updateButton.scopeAll}</option>
+      </select>
       <button
         type="button"
         onClick={startUpdate}

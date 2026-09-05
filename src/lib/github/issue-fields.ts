@@ -205,6 +205,12 @@ function extract(issue: IssueNode): IssueFields {
 /**
  * Issue field values for every issue in a repository, keyed by number.
  *
+ * `since` windows the sweep by the issue's updatedAt. Note that a field
+ * value changing on GitHub need not move that timestamp, so a windowed
+ * sweep can keep serving an old value; callers pass no window when they
+ * want every issue re-read. The caller chooses, because the trade is
+ * speed against staleness and only they know which they need.
+ *
  * Returns an empty map rather than throwing when the API does not know
  * these types: issue fields are newer than much of what this reads, and
  * a GitHub Enterprise Server that predates them should cost nothing more
@@ -253,6 +259,13 @@ export async function fetchIssueFields(
     if (!issues.pageInfo.hasNextPage) break;
     cursor = issues.pageInfo.endCursor;
     if (!cursor) break;
+    // Exhausting the cap means the oldest issues were never swept, and
+    // their Priority and Size would quietly stop being refreshed.
+    if (page === MAX_PAGES - 1) {
+      console.warn(
+        `[issue-fields] Stopped after ${MAX_PAGES} pages; issues beyond ${MAX_PAGES * ISSUES_PER_PAGE} are not being refreshed. Raise MAX_PAGES.`,
+      );
+    }
   }
 
   return byNumber;
