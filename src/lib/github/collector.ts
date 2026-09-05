@@ -5,6 +5,7 @@ import {
   getIssuesAssigneesSyncedAt,
   getIssuesProjectFieldsSyncedAt,
   getStoredProjectFields,
+  refreshIssueFields,
   replaceIssueRelations,
   replaceProjectFields,
   updatePRSize,
@@ -64,6 +65,7 @@ export function startCollection(
   owner: string,
   repo: string,
   tokenId?: string,
+  sinceOverride?: string | null,
 ): CollectionJob {
   const id = generateJobId();
   const job: CollectionJob = {
@@ -77,6 +79,7 @@ export function startCollection(
     error: null,
     dump_path: null,
     token_id: tokenId || null,
+    ...(sinceOverride !== undefined ? { since_override: sinceOverride } : {}),
   };
 
   jobs.set(id, job);
@@ -170,8 +173,16 @@ async function attachProjectFields(
   repo: string,
   token: string | undefined,
   since?: string,
-): Promise<{ current: boolean; error: string | null }> {
-  if (issues.length === 0) return { current: true, error: null };
+): Promise<{
+  current: boolean;
+  error: string | null;
+  /** Field values for issues this run did not fetch; written in place. */
+  pending: Parameters<typeof refreshIssueFields>[1];
+}> {
+  // No early return on an empty issue list. A run where nothing was
+  // updated is exactly when a Priority changed on GitHub without moving
+  // any updatedAt, and skipping the sweep there would leave the stale
+  // value on screen for good.
 
   const bearer = await resolveToken(token);
 
@@ -180,6 +191,11 @@ async function attachProjectFields(
   // the issue itself, with no board involved — and a token that cannot
   // see Projects at all can still read these. Doing it before the
   // Projects call means a refusal there costs only the board values.
+  // Windowed with the issues, so a routine Update stays cheap. Priority
+  // and Size can change on GitHub without moving an issue's updatedAt,
+  // so a windowed run can miss such a change — which is exactly what the
+  // caller widens the window for. The default is speed; the escape hatch
+  // is correctness, and the UI names both.
   const nativeFields = await fetchIssueFields(owner, repo, bearer, since);
   const nativeDefinitions = issueFieldDefinitions(nativeFields);
 
@@ -224,23 +240,50 @@ async function attachProjectFields(
       issue.project_id = existing?.projectId ?? null;
       issue.project_item_id = existing?.projectItemId ?? null;
     }
-    return { current: false, error: reason };
+    return { current: false, error: reason, pending: [] };
   }
 
   // The fetch succeeded, so an issue missing from the result genuinely
   // has no Priority or Size any more — it was taken off the board, or
   // the field was cleared. Absent means null, not "leave it alone".
-  for (const issue of issues) {
-    const fields = fetched.get(issue.number);
-    const native = nativeFields.get(issue.number);
+  const pending: Parameters<typeof refreshIssueFields>[1] = [];
+
+  // Every issue the sweep saw, not just the ones this run fetched: an
+  // issue whose Priority changed on GitHub is invisible to a
+  // differential issue fetch, so it has to be written from here.
+  const refreshed = new Set<number>([
+    ...fetched.keys(),
+    ...nativeFields.keys(),
+  ]);
+  for (const issue of issues) refreshed.add(issue.number);
+  const byNumber = new Map(issues.map((i) => [i.number, i]));
+
+  for (const number of refreshed) {
+    const issue = byNumber.get(number);
+    const fields = fetched.get(number);
+    const native = nativeFields.get(number);
+    const priority =
+      fields?.priority ?? pickField(native, PRIORITY_FIELD) ?? null;
+    const size = fields?.size ?? pickField(native, SIZE_FIELD) ?? null;
+    if (!issue) {
+      // Not in this run's issue set, so nothing will upsert it; the row
+      // is updated in place below instead.
+      pending.push({
+        number,
+        priority,
+        size,
+        projectId: fields?.projectId ?? null,
+        projectItemId: fields?.projectItemId ?? null,
+        nodeId: native?.nodeId ?? null,
+      });
+      continue;
+    }
     // A board value wins, and a native issue field only fills a gap.
     // Strictly additive on purpose: a repository already reading Size
     // off its board must not have that column change meaning because
-    // the organisation happens to define a native Effort as well. The
-    // bug being fixed here is an empty column, not a wrong one.
-    issue.priority =
-      fields?.priority ?? pickField(native, PRIORITY_FIELD) ?? null;
-    issue.size = fields?.size ?? pickField(native, SIZE_FIELD) ?? null;
+    // the organisation happens to define a native Effort as well.
+    issue.priority = priority;
+    issue.size = size;
     issue.project_id = fields?.projectId ?? null;
     issue.project_item_id = fields?.projectItemId ?? null;
     issue.node_id = native?.nodeId ?? null;
@@ -256,7 +299,7 @@ async function attachProjectFields(
       `[collector] Project fields found for ${fetched.size}/${issues.length} issues`,
     );
   }
-  return { current: true, error: null };
+  return { current: true, error: null, pending };
 }
 
 /**
@@ -348,8 +391,13 @@ async function runCollection(job: CollectionJob): Promise<void> {
     // Projects may stamp the marker.
     let projectFieldsCurrent = false;
     let projectFieldsError: string | null = null;
-    const issueSince =
-      needsAssigneeBackfill || needsProjectFieldBackfill
+    // An explicit window from the caller wins: it is the button someone
+    // presses when a value looks wrong, and second-guessing it would
+    // leave them no way to force a re-read.
+    const hasOverride = "since_override" in job;
+    const issueSince = hasOverride
+      ? (job.since_override ?? null)
+      : needsAssigneeBackfill || needsProjectFieldBackfill
         ? null
         : timestamps.issueSince;
 
@@ -429,6 +477,14 @@ async function runCollection(job: CollectionJob): Promise<void> {
       projectFieldsError = projectFieldResult.error;
 
       await upsertIssues(conn, newIssues);
+      // After the upsert, so a row inserted by this run is present to
+      // update, and so the upsert cannot overwrite what the sweep found.
+      await refreshIssueFields(conn, projectFieldResult.pending);
+      if (projectFieldResult.pending.length > 0) {
+        console.log(
+          `[collector] Refreshed project fields for ${projectFieldResult.pending.length} issues this run did not otherwise touch`,
+        );
+      }
 
       // Collect CI status for merged PRs that don't have ci_failed yet
       try {

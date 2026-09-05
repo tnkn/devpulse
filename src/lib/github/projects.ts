@@ -359,6 +359,7 @@ export async function fetchIssueProjectFields(
       owner,
       name: repo,
       cursor,
+      // See fetchIssueFields on what a window can miss.
       since: since ?? null,
     });
 
@@ -384,6 +385,13 @@ export async function fetchIssueProjectFields(
     if (!issues.pageInfo.hasNextPage) break;
     cursor = issues.pageInfo.endCursor;
     page++;
+    // Exhausting the cap means the oldest issues were never swept, and
+    // their Priority and Size would quietly stop being refreshed.
+    if (page === MAX_PAGES) {
+      console.warn(
+        `[projects] Stopped after ${MAX_PAGES} pages; issues beyond ${MAX_PAGES * ISSUES_PER_PAGE} are not being refreshed. Raise MAX_PAGES.`,
+      );
+    }
   }
 
   return fields;

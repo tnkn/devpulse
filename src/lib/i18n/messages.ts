@@ -168,6 +168,10 @@ export type Messages = {
     update: string;
     updateFailed: string;
     retry: string;
+    scopeAuto: string;
+    scopeDays: (days: number) => string;
+    scopeAll: string;
+    scopeHint: string;
   };
   deleteButton: {
     delete: string;
@@ -438,6 +442,11 @@ const en: Messages = {
     update: "Update",
     updateFailed: "Update failed",
     retry: "Retry",
+    scopeAuto: "Since last update",
+    scopeDays: (days) => `Last ${days} days`,
+    scopeAll: "Everything",
+    scopeHint:
+      "How far back to re-read. Since last update is enough for new issues. Priority and Size can change on GitHub without marking the issue as updated, so widen this if a value looks stale.",
   },
   deleteButton: {
     delete: "Delete",
@@ -752,6 +761,11 @@ const ja: Messages = {
     update: "\u66F4\u65B0",
     updateFailed: "\u66F4\u65B0\u306B\u5931\u6557\u3057\u307E\u3057\u305F",
     retry: "\u518D\u8A66\u884C",
+    scopeAuto: "\u524D\u56DE\u304B\u3089",
+    scopeDays: (days) => `\u76F4\u8FD1 ${days} \u65E5`,
+    scopeAll: "\u5168\u4EF6",
+    scopeHint:
+      "\u3069\u3053\u307E\u3067\u9061\u3063\u3066\u518D\u53D6\u5F97\u3059\u308B\u304B\u3002\u65B0\u898F issue \u306A\u3089\u300C\u524D\u56DE\u304B\u3089\u300D\u3067\u5341\u5206\u3067\u3059\u3002\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u306F GitHub \u4E0A\u3067\u5909\u66F4\u3057\u3066\u3082 issue \u306E\u66F4\u65B0\u65E5\u6642\u304C\u52D5\u304B\u306A\u3044\u3053\u3068\u304C\u3042\u308B\u306E\u3067\u3001\u5024\u304C\u53E4\u3044\u3068\u611F\u3058\u305F\u3089\u7BC4\u56F2\u3092\u5E83\u3052\u3066\u304F\u3060\u3055\u3044\u3002",
   },
   deleteButton: {
     delete: "\u524A\u9664",

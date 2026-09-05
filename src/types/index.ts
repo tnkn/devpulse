@@ -259,6 +259,16 @@ export interface CollectionJob {
   error: string | null;
   dump_path: string | null;
   token_id?: string | null;
+  /**
+   * How far back this run re-reads.
+   *
+   * Undefined is the normal case: carry on from the last run's
+   * watermark. A timestamp widens the window, and null means read
+   * everything — the escape hatch for when a value looks wrong, since
+   * Priority and Size can change on GitHub without moving an issue's
+   * updatedAt and a watermark run would never revisit them.
+   */
+  since_override?: string | null;
 }
 
 // 個人毎メトリクス型定義
