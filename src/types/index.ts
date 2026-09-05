@@ -54,6 +54,11 @@ export interface Issue {
   number: number;
   /** GitHub's global issue id. Required by the issue dependencies API. */
   id?: number;
+  /**
+   * The GraphQL node id, which is a different identifier from `id` above.
+   * Writing a native issue field is addressed to this one.
+   */
+  node_id?: string | null;
   title: string;
   state: "open" | "closed";
   created_at: string;

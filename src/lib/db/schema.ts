@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS issues (
   closed_at TEXT,
   labels_json TEXT DEFAULT '[]',
   assignees_json TEXT DEFAULT '[]',
-  issue_id BIGINT
+  issue_id BIGINT,
+  issue_node_id TEXT
 );
 
 -- Mirror of GitHub's "blocked by" issue dependencies. GitHub is the
@@ -170,6 +171,9 @@ ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_error TEXT;
 -- only the board ones can be edited so far, so the two cannot be merged
 -- into one undifferentiated list.
 ALTER TABLE project_fields ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'project';
+-- The GraphQL node id, which is not the REST database id already in
+-- issue_id. setIssueFieldValue addresses an issue by the former.
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS issue_node_id TEXT;
 
 CREATE TABLE IF NOT EXISTS issue_sub_issues (
   parent_number INTEGER NOT NULL,

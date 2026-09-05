@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { checkpoint, getConnection } from "@/lib/db";
 import {
+  getIssueNodeId,
   getIssueProjectItem,
   listProjectFields,
   setIssueFieldsLocally,
@@ -10,6 +11,10 @@ import {
   resolveToken,
   setIssueAssignees,
 } from "@/lib/github/client";
+import {
+  IssueFieldValueError,
+  setIssueFieldValue,
+} from "@/lib/github/issue-fields";
 import {
   ProjectFieldValueError,
   ProjectsUnavailableError,
@@ -130,15 +135,65 @@ export async function POST(request: NextRequest) {
       | Awaited<ReturnType<typeof listProjectFields>>[number]
       | null;
     let item: Awaited<ReturnType<typeof getIssueProjectItem>>;
+    let nativeDefinition:
+      | Awaited<ReturnType<typeof listProjectFields>>[number]
+      | null = null;
+    let issueNodeId: string | null = null;
     try {
       const definitions = await listProjectFields(conn);
       item = await getIssueProjectItem(conn, issueNumber);
       definition =
         definitions.find(
-          (d) => d.kind === body.field && d.projectId === item?.projectId,
+          (d) =>
+            d.kind === body.field &&
+            d.source === "project" &&
+            d.projectId === item?.projectId,
         ) ?? null;
+      // A board is not the only place these live. When no board field
+      // matches, the value may be one of GitHub's native issue fields,
+      // which is written through a different mutation entirely.
+      nativeDefinition =
+        definitions.find(
+          (d) => d.kind === body.field && d.source === "issue-field",
+        ) ?? null;
+      issueNodeId = await getIssueNodeId(conn, issueNumber);
     } finally {
       conn.closeSync();
+    }
+
+    // The native path is tried first only when the board has nothing to
+    // offer, mirroring the read: a board value wins, so a board edit does.
+    if (!definition && nativeDefinition) {
+      if (!issueNodeId) {
+        return NextResponse.json(
+          {
+            error:
+              "This issue has no node id stored yet. Run Update once so the issue fields can be written.",
+            code: "no_node_id",
+          },
+          { status: 409 },
+        );
+      }
+      const applied = await setIssueFieldValue(
+        await resolveToken(token),
+        issueNodeId,
+        {
+          fieldId: nativeDefinition.fieldId,
+          dataType: nativeDefinition.dataType,
+          options: nativeDefinition.options,
+        },
+        body.value?.trim() ? body.value.trim() : null,
+      );
+      const write = await getConnection(repoKey);
+      try {
+        await setIssueFieldsLocally(write, issueNumber, {
+          [body.field]: applied,
+        });
+      } finally {
+        write.closeSync();
+      }
+      await checkpoint(repoKey);
+      return NextResponse.json({ [body.field]: applied });
     }
 
     if (!item) {
@@ -189,6 +244,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: err.message, code: "forbidden" },
         { status: 403 },
+      );
+    }
+    if (err instanceof IssueFieldValueError) {
+      return NextResponse.json(
+        { error: err.message, code: "rejected" },
+        { status: 422 },
       );
     }
     if (err instanceof ProjectFieldValueError) {

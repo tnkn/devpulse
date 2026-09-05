@@ -243,6 +243,7 @@ async function attachProjectFields(
     issue.size = fields?.size ?? pickField(native, SIZE_FIELD) ?? null;
     issue.project_id = fields?.projectId ?? null;
     issue.project_item_id = fields?.projectItemId ?? null;
+    issue.node_id = native?.nodeId ?? null;
   }
   if (fetched.size === 0) {
     // Reached GitHub, understood the answer, and it was "nothing" — which
