@@ -103,6 +103,11 @@ export interface ProjectFieldDefinition {
   kind: "priority" | "size" | "other";
   /** GitHub's ProjectV2FieldType: SINGLE_SELECT, NUMBER, TEXT, ... */
   dataType: string;
+  /**
+   * Which API the definition came from. "issue-field" is one of GitHub's
+   * native issue fields, which live on the issue rather than on a board.
+   */
+  source: "project" | "issue-field";
   /** Empty unless the field is a single select. */
   options: { id: string; name: string }[];
 }

@@ -171,8 +171,8 @@ export async function replaceProjectFields(
   if (definitions.length === 0) return;
 
   const stmt = await conn.prepare(
-    `INSERT OR REPLACE INTO project_fields (project_id, field_id, project_title, field_name, kind, data_type, options_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT OR REPLACE INTO project_fields (project_id, field_id, project_title, field_name, kind, data_type, options_json, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
   );
   for (const d of definitions) {
     stmt.bindVarchar(1, d.projectId);
@@ -182,6 +182,7 @@ export async function replaceProjectFields(
     stmt.bindVarchar(5, d.kind);
     stmt.bindVarchar(6, d.dataType);
     stmt.bindVarchar(7, JSON.stringify(d.options));
+    stmt.bindVarchar(8, d.source);
     await stmt.run();
   }
   stmt.destroySync();
@@ -192,7 +193,7 @@ export async function listProjectFields(
   conn: DuckDBConnection,
 ): Promise<ProjectFieldDefinition[]> {
   const reader = await conn.runAndReadAll(
-    "SELECT project_id, field_id, project_title, field_name, kind, data_type, options_json FROM project_fields ORDER BY project_id, kind",
+    "SELECT project_id, field_id, project_title, field_name, kind, data_type, options_json, source FROM project_fields ORDER BY project_id, kind",
   );
   return reader.getRows().map((row) => ({
     projectId: String(row[0]),
@@ -202,6 +203,9 @@ export async function listProjectFields(
     kind: String(row[4]) as ProjectFieldDefinition["kind"],
     dataType: String(row[5]),
     options: row[6] == null ? [] : JSON.parse(String(row[6])),
+    source: (row[7] == null
+      ? "project"
+      : String(row[7])) as ProjectFieldDefinition["source"],
   }));
 }
 

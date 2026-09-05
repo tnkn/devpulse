@@ -1,4 +1,5 @@
 import type { IssueProjectFields, ProjectFieldDefinition } from "@/types";
+import { PRIORITY_FIELD, SIZE_FIELD } from "./field-names";
 
 // Same override as the REST client, so GitHub Enterprise Server and the
 // test stub are pointed at one place. api.github.com serves GraphQL at
@@ -16,21 +17,6 @@ const FIELDS_PER_PROJECT = 50;
 const PROJECT_ITEMS_PER_ISSUE = 5;
 const FIELD_VALUES_PER_ITEM = 20;
 const MAX_PAGES = 100;
-
-/**
- * Field names are matched rather than hard-coded to "Priority" and
- * "Size": those are only the defaults of GitHub's project templates.
- *
- * Matched on containment rather than equality, because boards rename
- * these constantly — "Priority Level", "Prio", "優先度", "🔥 Priority",
- * "Size (t-shirt)" — and an exact match reads none of them, silently.
- * The cost of being generous is a field called something like "Sizing
- * notes" being picked up; the cost of being strict is the feature
- * appearing broken with no way to tell why, which is far worse.
- */
-const PRIORITY_FIELD = /priority|prio\b|優先/i;
-const SIZE_FIELD =
-  /size|estimate|story\s*points?|\bpoints?\b|\bsp\b|見積|サイズ|規模/i;
 
 /**
  * Reads Priority and Size off the Projects v2 items an issue belongs to.
@@ -180,7 +166,7 @@ function extractFields(issue: IssueNode): IssueProjectFields {
  * FORBIDDEN carried in the body of an otherwise successful 200 — which
  * is how a missing scope usually arrives.
  */
-async function postGraphQL<
+export async function postGraphQL<
   T extends { errors?: { type?: string; message: string }[] },
 >(
   token: string,
@@ -319,6 +305,7 @@ export async function fetchProjectFieldDefs(
         fieldId: field.id,
         fieldName: field.name,
         kind,
+        source: "project",
         dataType: field.dataType ?? "TEXT",
         options: field.options ?? [],
       });
