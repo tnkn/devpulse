@@ -197,17 +197,18 @@ export function DependencyTable({
     (kind: ProjectFieldKind, projectItemId: string | null) => {
       if (boardProblem.blocked) return boardProblem.notice;
       if (boardProblem.missing.has(kind)) return boardProblem.notice;
-      // A value read from one of GitHub's native issue fields has no
-      // board item behind it, so the Projects mutation cannot write it.
-      // Said plainly rather than reported as "not on a board", which
-      // would send someone to add the issue to a board that would not
-      // have helped.
-      if (
-        !projectFields.some((d) => d.kind === kind && d.source === "project")
-      ) {
-        return t.dependencies.nativeFieldReadOnly;
-      }
-      if (!projectItemId) return t.dependencies.notOnBoard;
+      // Either source can be written, so the cell is editable if either
+      // has the field. Only when the board is the sole candidate does
+      // being off the board matter — a native field is on the issue
+      // itself and needs no board item.
+      const onBoard = projectFields.some(
+        (d) => d.kind === kind && d.source === "project",
+      );
+      const native = projectFields.some(
+        (d) => d.kind === kind && d.source === "issue-field",
+      );
+      if (native) return undefined;
+      if (onBoard && !projectItemId) return t.dependencies.notOnBoard;
       return undefined;
     },
     [boardProblem, projectFields, t],
@@ -216,12 +217,19 @@ export function DependencyTable({
   /** The options a board offers for one of the two fields. */
   const optionsFor = useCallback(
     (kind: "priority" | "size", projectId: string | null) => {
-      const definition = projectFields.find(
-        (d) =>
-          d.kind === kind &&
-          d.source === "project" &&
-          (!projectId || d.projectId === projectId),
-      );
+      // A board definition first, to match the read: a board value wins,
+      // so its options are the ones an edit should offer. The native
+      // field's options stand in when the board has no such field.
+      const definition =
+        projectFields.find(
+          (d) =>
+            d.kind === kind &&
+            d.source === "project" &&
+            (!projectId || d.projectId === projectId),
+        ) ??
+        projectFields.find(
+          (d) => d.kind === kind && d.source === "issue-field",
+        );
       return definition?.options.map((o) => o.name) ?? [];
     },
     [projectFields],

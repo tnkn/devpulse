@@ -105,8 +105,8 @@ export async function upsertIssues(
     // Project fields are listed here, not written by a later UPDATE:
     // INSERT OR REPLACE rewrites the whole row, so a column left out
     // would be blanked every time an issue is re-collected.
-    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id, priority, size, project_id, project_item_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    `INSERT OR REPLACE INTO issues (number, title, state, created_at, updated_at, closed_at, labels_json, assignees_json, issue_id, priority, size, project_id, project_item_id, issue_node_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
   );
   for (const i of issues) {
     stmt.bindInteger(1, i.number);
@@ -128,9 +128,26 @@ export async function upsertIssues(
     else stmt.bindNull(12);
     if (i.project_item_id) stmt.bindVarchar(13, i.project_item_id);
     else stmt.bindNull(13);
+    if (i.node_id) stmt.bindVarchar(14, i.node_id);
+    else stmt.bindNull(14);
     await stmt.run();
   }
   stmt.destroySync();
+}
+
+/** The issue's GraphQL node id, or null if it was never collected. */
+export async function getIssueNodeId(
+  conn: DuckDBConnection,
+  issueNumber: number,
+): Promise<string | null> {
+  const stmt = await conn.prepare(
+    "SELECT issue_node_id FROM issues WHERE number = $1",
+  );
+  stmt.bindInteger(1, issueNumber);
+  const reader = await stmt.runAndReadAll();
+  stmt.destroySync();
+  const rows = reader.getRows();
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
 }
 
 /**

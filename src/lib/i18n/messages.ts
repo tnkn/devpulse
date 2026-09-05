@@ -221,7 +221,6 @@ export type Messages = {
     colParent: string;
     clickToEdit: string;
     notOnBoard: string;
-    nativeFieldReadOnly: string;
     projectsNotCollected: string;
     projectsUnreadable: (reason: string) => string;
     projectsFailed: (reason: string) => string;
@@ -496,8 +495,6 @@ const en: Messages = {
       "This issue is not on a project board, so it has no Priority or Size to set.",
     projectsNotCollected:
       "Project fields have not been collected yet. Press Update — and check the token can read Projects.",
-    nativeFieldReadOnly:
-      "This value comes from one of GitHub's native issue fields, which this app can read but cannot yet write. Edit it on GitHub.",
     projectsUnreadable: (reason) =>
       `GitHub refused to show Projects to this token, so Priority and Size cannot be read. A classic token needs the read:project scope; a fine-grained token needs Projects: Read-only, and for a board owned by an organisation, that permission on the organisation as well. GitHub said: ${reason}`,
     projectsFailed: (reason) =>
@@ -820,8 +817,6 @@ const ja: Messages = {
       "\u3053\u306E Issue \u306F\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30DC\u30FC\u30C9\u306B\u8F09\u3063\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u8A2D\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002",
     projectsNotCollected:
       "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u30D5\u30A3\u30FC\u30EB\u30C9\u304C\u672A\u53D6\u5F97\u3067\u3059\u3002\u300C\u66F4\u65B0\u300D\u3092\u5B9F\u884C\u3057\u3001\u30C8\u30FC\u30AF\u30F3\u306B\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u8AAD\u307F\u53D6\u308A\u6A29\u9650\u304C\u3042\u308B\u304B\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-    nativeFieldReadOnly:
-      "\u3053\u306E\u5024\u306F GitHub \u30CD\u30A4\u30C6\u30A3\u30D6\u306E issue \u30D5\u30A3\u30FC\u30EB\u30C9\u7531\u6765\u3067\u3059\u3002\u8AAD\u307F\u53D6\u308A\u306F\u3067\u304D\u307E\u3059\u304C\u3001\u66F8\u304D\u8FBC\u307F\u306F\u672A\u5BFE\u5FDC\u3067\u3059\u3002GitHub \u4E0A\u3067\u5909\u66F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
     projectsUnreadable: (reason) =>
       `GitHub \u304C\u3053\u306E\u30C8\u30FC\u30AF\u30F3\u306B Projects \u3092\u898B\u305B\u3066\u3044\u307E\u305B\u3093\u3002\u305D\u306E\u305F\u3081\u512A\u5148\u5EA6\u30FB\u30B5\u30A4\u30BA\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002classic \u30C8\u30FC\u30AF\u30F3\u306B\u306F read:project \u30B9\u30B3\u30FC\u30D7\u3001fine-grained \u30C8\u30FC\u30AF\u30F3\u306B\u306F Projects: Read-only \u304C\u5FC5\u8981\u3067\u3059\u3002Organization \u6240\u6709\u306E\u30DC\u30FC\u30C9\u306E\u5834\u5408\u306F Organization \u5074\u306E\u6A29\u9650\u3082\u5FC5\u8981\u3067\u3059\u3002GitHub \u306E\u5FDC\u7B54: ${reason}`,
     projectsFailed: (reason) =>

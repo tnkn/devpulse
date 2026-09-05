@@ -51,6 +51,9 @@ query IssueFieldValues($owner: String!, $name: String!, $cursor: String, $since:
       pageInfo { hasNextPage endCursor }
       nodes {
         number
+        # The node id, not the REST database id: setIssueFieldValue takes
+        # issueId: ID!, and the two are different identifiers.
+        id
         viewerCanSetFields
         issueFieldValues(first: ${VALUES_PER_ISSUE}) {
           totalCount
@@ -60,7 +63,11 @@ query IssueFieldValues($owner: String!, $name: String!, $cursor: String, $since:
               field {
                 __typename
                 ... on IssueFieldCommon { name dataType }
-                ... on IssueFieldSingleSelect { id }
+                # Options come from the field, never from the values:
+                # reading what issues happen to hold cannot reveal an
+                # option nobody has used yet, and a picker missing one is
+                # worse than no picker. options takes no arguments.
+                ... on IssueFieldSingleSelect { id options { id name } }
                 ... on IssueFieldNumber { id }
                 ... on IssueFieldText { id }
                 ... on IssueFieldDate { id }
@@ -84,6 +91,7 @@ interface FieldNode {
   name?: string | null;
   dataType?: string | null;
   id?: string | null;
+  options?: { id: string; name: string }[] | null;
 }
 
 interface ValueNode {
@@ -99,6 +107,7 @@ interface ValueNode {
 
 interface IssueNode {
   number: number;
+  id?: string | null;
   viewerCanSetFields?: boolean | null;
   issueFieldValues?: {
     totalCount: number;
@@ -121,6 +130,8 @@ interface QueryResponse {
 /** One issue field's value, as read off an issue. */
 export interface IssueFieldValue {
   fieldName: string;
+  /** The field's own options, for a single select; empty otherwise. */
+  options: { id: string; name: string }[];
   /** GitHub's IssueFieldDataType: SINGLE_SELECT, NUMBER, TEXT, DATE, MULTI_SELECT. */
   dataType: string;
   fieldId: string | null;
@@ -131,6 +142,8 @@ export interface IssueFieldValue {
 }
 
 export interface IssueFields {
+  /** The issue's GraphQL node id, which is what a write is addressed to. */
+  nodeId: string | null;
   values: IssueFieldValue[];
   /** GitHub's own answer to whether this issue's fields can be edited. */
   canSet: boolean;
@@ -175,13 +188,18 @@ function extract(issue: IssueNode): IssueFields {
     if (!node || !fieldName) continue;
     values.push({
       fieldName,
+      options: node.field?.options ?? [],
       dataType: node.field?.dataType ?? "",
       fieldId: node.field?.id ?? null,
       display: displayValue(node),
       optionId: node.optionId ?? null,
     });
   }
-  return { values, canSet: issue.viewerCanSetFields === true };
+  return {
+    nodeId: issue.id ?? null,
+    values,
+    canSet: issue.viewerCanSetFields === true,
+  };
 }
 
 /**
@@ -293,13 +311,135 @@ export function issueFieldDefinitions(
         kind,
         dataType: value.dataType,
         source: "issue-field",
-        // Left empty deliberately: reading a value tells us nothing about
-        // which other options the field offers, and inventing a list from
-        // the values seen would offer a picker that silently omits any
-        // option nobody has used yet.
-        options: [],
+        options: value.options,
       });
     }
   }
   return [...seen.values()];
+}
+
+/**
+ * Refused before the mutation when the wording is not one the field
+ * offers, so the caller gets the list rather than GitHub's rejection of
+ * an option id it could not resolve.
+ */
+export class IssueFieldValueError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "IssueFieldValueError";
+  }
+}
+
+const SET_ISSUE_FIELD_VALUE = `
+mutation SetIssueFieldValue($input: SetIssueFieldValueInput!) {
+  setIssueFieldValue(input: $input) {
+    issueFieldValues {
+      __typename
+      ... on IssueFieldValueCommon {
+        field {
+          ... on IssueFieldCommon { name }
+          ... on IssueFieldSingleSelect { id }
+          ... on IssueFieldNumber { id }
+          ... on IssueFieldText { id }
+          ... on IssueFieldDate { id }
+          ... on IssueFieldMultiSelect { id }
+        }
+      }
+      ... on IssueFieldSingleSelectValue { singleSelect: name }
+      ... on IssueFieldNumberValue { number: value }
+      ... on IssueFieldTextValue { text: value }
+      ... on IssueFieldDateValue { date: value }
+      ... on IssueFieldMultiSelectValue { multi: value }
+    }
+  }
+}`;
+
+interface MutationResponse {
+  data?: {
+    setIssueFieldValue?: {
+      issueFieldValues?: (ValueNode | null)[] | null;
+    } | null;
+  };
+  errors?: { type?: string; message: string }[];
+}
+
+/**
+ * Writes one native issue field and reports what GitHub then holds.
+ *
+ * The payload's own value list is read back rather than the request
+ * echoed, so a caller can only record what GitHub actually accepted —
+ * the same rule the rest of this app follows for dependencies.
+ *
+ * `delete: true` clears the field: the input has no way to express "set
+ * to nothing", and sending an empty option id would be a different
+ * request GitHub would reject.
+ */
+export async function setIssueFieldValue(
+  token: string,
+  issueNodeId: string,
+  field: {
+    fieldId: string;
+    dataType: string;
+    options: { id: string; name: string }[];
+  },
+  value: string | null,
+): Promise<string | null> {
+  const entry: Record<string, unknown> = { fieldId: field.fieldId };
+
+  if (value === null) {
+    entry.delete = true;
+  } else {
+    switch (field.dataType) {
+      case "SINGLE_SELECT": {
+        const option = field.options.find(
+          (o) => o.name.toLowerCase() === value.toLowerCase(),
+        );
+        if (!option) {
+          throw new IssueFieldValueError(
+            `"${value}" is not an option. Available: ${field.options.map((o) => o.name).join(", ")}`,
+          );
+        }
+        entry.singleSelectOptionId = option.id;
+        break;
+      }
+      case "NUMBER": {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) {
+          throw new IssueFieldValueError(`"${value}" is not a number.`);
+        }
+        entry.numberValue = parsed;
+        break;
+      }
+      case "TEXT":
+        entry.textValue = value;
+        break;
+      case "DATE":
+        entry.dateValue = value;
+        break;
+      default:
+        throw new IssueFieldValueError(
+          `Fields of type ${field.dataType} cannot be edited here.`,
+        );
+    }
+  }
+
+  const body = await postGraphQL<MutationResponse>(
+    token,
+    SET_ISSUE_FIELD_VALUE,
+    { input: { issueId: issueNodeId, issueFields: [entry] } },
+  );
+
+  // Read back what GitHub now holds for this field, not what was asked
+  // for. Matched on the field id rather than position or name: the
+  // payload lists every field on the issue, so taking the first would
+  // report some other field's value as this one's.
+  const written = (body.data?.setIssueFieldValue?.issueFieldValues ?? []).find(
+    (node) => node?.field?.id === field.fieldId,
+  );
+  if (!written) {
+    throw new IssueFieldValueError(
+      "GitHub accepted the request but returned no value for this field.",
+    );
+  }
+  return displayValue(written);
 }
