@@ -197,17 +197,30 @@ export function DependencyTable({
     (kind: ProjectFieldKind, projectItemId: string | null) => {
       if (boardProblem.blocked) return boardProblem.notice;
       if (boardProblem.missing.has(kind)) return boardProblem.notice;
+      // A value read from one of GitHub's native issue fields has no
+      // board item behind it, so the Projects mutation cannot write it.
+      // Said plainly rather than reported as "not on a board", which
+      // would send someone to add the issue to a board that would not
+      // have helped.
+      if (
+        !projectFields.some((d) => d.kind === kind && d.source === "project")
+      ) {
+        return t.dependencies.nativeFieldReadOnly;
+      }
       if (!projectItemId) return t.dependencies.notOnBoard;
       return undefined;
     },
-    [boardProblem, t],
+    [boardProblem, projectFields, t],
   );
 
   /** The options a board offers for one of the two fields. */
   const optionsFor = useCallback(
     (kind: "priority" | "size", projectId: string | null) => {
       const definition = projectFields.find(
-        (d) => d.kind === kind && (!projectId || d.projectId === projectId),
+        (d) =>
+          d.kind === kind &&
+          d.source === "project" &&
+          (!projectId || d.projectId === projectId),
       );
       return definition?.options.map((o) => o.name) ?? [];
     },

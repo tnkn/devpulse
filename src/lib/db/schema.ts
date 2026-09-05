@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS project_fields (
   kind TEXT NOT NULL,
   data_type TEXT NOT NULL,
   options_json TEXT DEFAULT '[]',
+  source TEXT DEFAULT 'project',
   PRIMARY KEY (project_id, field_id)
 );
 
@@ -164,6 +165,11 @@ ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_synced_at TE
 -- cannot see Projects" instead of "not collected yet" — which reads as
 -- "you have not pressed Update" and sends people looking in the wrong place.
 ALTER TABLE metadata ADD COLUMN IF NOT EXISTS issues_project_fields_error TEXT;
+-- Where a field definition came from: a Projects v2 board, or one of
+-- GitHub's native issue fields. They are read through different APIs and
+-- only the board ones can be edited so far, so the two cannot be merged
+-- into one undifferentiated list.
+ALTER TABLE project_fields ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'project';
 
 CREATE TABLE IF NOT EXISTS issue_sub_issues (
   parent_number INTEGER NOT NULL,

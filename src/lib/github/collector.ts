@@ -36,6 +36,12 @@ import {
   getSubIssues,
   resolveToken,
 } from "./client";
+import { PRIORITY_FIELD, SIZE_FIELD } from "./field-names";
+import {
+  fetchIssueFields,
+  issueFieldDefinitions,
+  pickField,
+} from "./issue-fields";
 import {
   fetchIssueProjectFields,
   fetchProjectFieldDefs,
@@ -167,17 +173,26 @@ async function attachProjectFields(
 ): Promise<{ current: boolean; error: string | null }> {
   if (issues.length === 0) return { current: true, error: null };
 
+  const bearer = await resolveToken(token);
+
+  // Read first, and never fatally: GitHub's native issue fields are an
+  // independent source — every organisation gets Priority and Effort on
+  // the issue itself, with no board involved — and a token that cannot
+  // see Projects at all can still read these. Doing it before the
+  // Projects call means a refusal there costs only the board values.
+  const nativeFields = await fetchIssueFields(owner, repo, bearer, since);
+  const nativeDefinitions = issueFieldDefinitions(nativeFields);
+
   let fetched: Map<number, IssueProjectFields>;
   try {
-    const bearer = await resolveToken(token);
     fetched = await fetchIssueProjectFields(owner, repo, bearer, since);
     // Cached alongside the values because an issue with no Priority set
     // carries no value to learn the field's id from, and an unset field
     // is exactly the one an editor needs to offer options for.
-    await replaceProjectFields(
-      conn,
-      await fetchProjectFieldDefs(owner, repo, bearer),
-    );
+    await replaceProjectFields(conn, [
+      ...(await fetchProjectFieldDefs(owner, repo, bearer)),
+      ...nativeDefinitions,
+    ]);
   } catch (err) {
     // Kept, not just logged. A refusal here is the difference between
     // "press Update" and "your token cannot see Projects", and a server
@@ -196,10 +211,16 @@ async function attachProjectFields(
       conn,
       issues.map((i) => i.number),
     );
+    // The native fields were read successfully, so they still apply —
+    // losing a Priority that GitHub handed over, because a *different*
+    // API refused, would be throwing away good data.
+    await replaceProjectFields(conn, nativeDefinitions);
     for (const issue of issues) {
       const existing = stored.get(issue.number);
-      issue.priority = existing?.priority ?? null;
-      issue.size = existing?.size ?? null;
+      const native = nativeFields.get(issue.number);
+      issue.priority =
+        existing?.priority ?? pickField(native, PRIORITY_FIELD) ?? null;
+      issue.size = existing?.size ?? pickField(native, SIZE_FIELD) ?? null;
       issue.project_id = existing?.projectId ?? null;
       issue.project_item_id = existing?.projectItemId ?? null;
     }
@@ -211,8 +232,15 @@ async function attachProjectFields(
   // the field was cleared. Absent means null, not "leave it alone".
   for (const issue of issues) {
     const fields = fetched.get(issue.number);
-    issue.priority = fields?.priority ?? null;
-    issue.size = fields?.size ?? null;
+    const native = nativeFields.get(issue.number);
+    // A board value wins, and a native issue field only fills a gap.
+    // Strictly additive on purpose: a repository already reading Size
+    // off its board must not have that column change meaning because
+    // the organisation happens to define a native Effort as well. The
+    // bug being fixed here is an empty column, not a wrong one.
+    issue.priority =
+      fields?.priority ?? pickField(native, PRIORITY_FIELD) ?? null;
+    issue.size = fields?.size ?? pickField(native, SIZE_FIELD) ?? null;
     issue.project_id = fields?.projectId ?? null;
     issue.project_item_id = fields?.projectItemId ?? null;
   }

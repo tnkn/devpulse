@@ -98,6 +98,7 @@ const DEMO_PROJECT_FIELDS = [
     fieldId: "PVTSSF_demo_priority",
     fieldName: "Priority",
     kind: "priority" as const,
+    source: "project" as const,
     dataType: "SINGLE_SELECT",
     options: [
       { id: "opt_p0", name: "P0" },
@@ -112,6 +113,7 @@ const DEMO_PROJECT_FIELDS = [
     fieldId: "PVTSSF_demo_size",
     fieldName: "Size",
     kind: "size" as const,
+    source: "project" as const,
     dataType: "SINGLE_SELECT",
     options: [
       { id: "opt_xs", name: "XS" },
