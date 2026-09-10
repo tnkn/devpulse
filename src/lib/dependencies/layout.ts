@@ -59,8 +59,43 @@ export function layoutDependencyGraph(
   links: DependencyGraphLink[],
   direction: LayoutDirection = "TB",
 ): Map<string, NodeRect> {
+  const childrenOf = new Map<string, DependencyGraphNode[]>();
+  for (const node of nodes) {
+    if (node.kind === "terminal" || !node.parentId) continue;
+    const siblings = childrenOf.get(node.parentId);
+    if (siblings) siblings.push(node);
+    else childrenOf.set(node.parentId, [node]);
+  }
+
+  /**
+   * dagre does not support an edge attached to a node that has children:
+   * clusters are swapped for border nodes before ranking, and ranking
+   * then reads the label of a node the swap removed. So an endpoint that
+   * is a group is moved to a leaf inside it — a cluster-spanning edge,
+   * which compound graphs do support. Nested groups are followed down to
+   * the leaf; a hierarchy that loops back on itself stops where it
+   * repeats. Ranking the leaf places the box too, since a group's
+   * rectangle is derived from its children's bounding box below.
+   */
+  const anchorFor = (id: string): string => {
+    let current = id;
+    const seen = new Set<string>([id]);
+    for (;;) {
+      const child = childrenOf.get(current)?.[0];
+      if (!child || seen.has(child.id)) return current;
+      seen.add(child.id);
+      current = child.id;
+    }
+  };
+
   const graph = new dagre.graphlib.Graph({ compound: true });
   graph.setDefaultEdgeLabel(() => ({}));
+  // An edge can name a node that was never added; without a default it
+  // would be created label-less and break ranking the same way.
+  graph.setDefaultNodeLabel(() => ({
+    width: ISSUE_NODE_WIDTH,
+    height: ISSUE_NODE_HEIGHT,
+  }));
   graph.setGraph({
     rankdir: direction,
     ...SPACING[direction],
@@ -78,7 +113,13 @@ export function layoutDependencyGraph(
     }
   }
   for (const link of links) {
-    graph.setEdge(link.source, link.target);
+    const source = anchorFor(link.source);
+    const target = anchorFor(link.target);
+    // A link between a group and its own contents collapses onto one
+    // node, so it says nothing about rank; passing it would only make
+    // dagre reserve room for a self-loop that is never drawn.
+    if (source === target) continue;
+    graph.setEdge(source, target);
   }
 
   dagre.layout(graph);
@@ -101,14 +142,6 @@ export function layoutDependencyGraph(
   // inside it, so each group is resized to the bounding box of its
   // children plus padding and room for the header label. Innermost
   // groups are sized first so nested groups grow around finished boxes.
-  const childrenOf = new Map<string, DependencyGraphNode[]>();
-  for (const node of nodes) {
-    if (node.kind === "terminal" || !node.parentId) continue;
-    const siblings = childrenOf.get(node.parentId);
-    if (siblings) siblings.push(node);
-    else childrenOf.set(node.parentId, [node]);
-  }
-
   const parentIdOf = new Map<string, string>();
   for (const node of nodes) {
     if (node.kind !== "terminal" && node.parentId) {
