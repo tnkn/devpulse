@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "dev-vis - GitHub Repository Metrics",
+  title: "devpulse - GitHub Repository Metrics",
   description: "Visualize DORA metrics for your GitHub repositories",
 };
 

@@ -1,4 +1,4 @@
-# dev-vis
+# devpulse
 
 GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev/guides/dora-metrics-four-keys/) に基づいて可視化する Web アプリケーションです。
 
@@ -56,7 +56,7 @@ GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev
 
 各リポジトリページの **「Dependency Graph」** リンクから、Issue 間の依存関係を [React Flow](https://reactflow.dev/) のキャンバスで可視化できます。レイアウトは dagre による自動配置（上から下）で、パン / ズーム / ミニマップに対応しています。
 
-**GitHub が正（source of truth）です。** dev-vis 独自の依存関係データは持たず、GitHub の Issue 依存関係 API と同期します。
+**GitHub が正（source of truth）です。** devpulse 独自の依存関係データは持たず、GitHub の Issue 依存関係 API と同期します。
 
 - **2 種類の関係を描き分け** — 性質が違うので表現も分けています。依存関係（blocked by）は**矢印**、サブイシューの親子関係は**枠（親 Issue が子を囲むコンテナ）**として描画します。親子を矢印にすると「親が終わってから子」と誤読されるためです（実際は逆で、子が終わって親が完了します）。
 - **読み取り** — 「更新」ボタンによる収集時に、各 Issue の `dependencies/blocked_by` と `sub_issues` を取得してローカル DB を GitHub の状態で置き換えます。GitHub 側で削除された関係はローカルからも消えます。

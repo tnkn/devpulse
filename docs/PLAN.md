@@ -1,4 +1,4 @@
-# dev-vis 開発計画
+# devpulse 開発計画
 
 ## 概要
 
@@ -92,7 +92,7 @@ GitHubリポジトリごとの開発状況をDORAメトリクスに基づいて�
 ## ディレクトリ構成
 
 ```
-dev-vis/
+devpulse/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── page.tsx            # ホーム（リポジトリ一覧）
