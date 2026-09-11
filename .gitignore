@@ -46,3 +46,7 @@ next-env.d.ts
 
 # encryption key (auto-generated)
 .encryption_key
+
+# claude code project settings / local docs
+/.claude
+/docs
