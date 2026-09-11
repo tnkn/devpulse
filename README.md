@@ -1,215 +1,93 @@
 # devpulse
 
-GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev/guides/dora-metrics-four-keys/) に基づいて可視化する Web アプリケーションです。
+GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev/guides/dora-metrics-four-keys/) に基づいて可視化する Web アプリケーション。Issue 間の依存関係グラフ表示にも対応しています。
 
-## DORA メトリクス
+## Features
 
-| メトリクス | 説明 | データソース |
-|---|---|---|
-| **Deployment Frequency** | デプロイ頻度（日・週・月別） | マージ済み PR 数 |
-| **Lead Time for Changes** | 変更のリードタイム | PR 作成〜マージまでの時間 |
-| **Change Failure Rate** | 変更失敗率 | マージ時の CI 失敗率 |
-| **Revert Rate** | リバート率 | リバートコミットの割合 |
-| **Change Size** | 変更サイズ | PR あたりの変更行数（LOC） |
-| **Time to First Review** | 初回レビュー時間 | PR 作成〜最初のレビューまでの時間 |
-
-## 主な機能
-
-- **DORA メトリクスダッシュボード** — 6 種類のチャートと詳細テーブル
-- **期間粒度の切り替え** — 日・週・月でチャートを切り替え
-- **日付フィルター** — 任意の期間に絞り込み
-- **個人別メトリクス** — マージ PR 数（Assignee ベース）・レビュー数を個人別に集計
-- **アクティビティ履歴モーダル** — ユーザー名クリックで PR・コミット・レビューの詳細をタブ表示（GitHub リンク付き）
-- **多言語対応** — 英語 / 日本語の切り替え
-- **複数リポジトリの比較**
-- **Issue 依存関係グラフ** — React Flow のインタラクティブなキャンバスで Issue 間の依存関係を可視化。特定の Issue やラベルを起点に部分グラフを表示可能。ソート可能なテーブル表示にも切り替え可能
+- **DORA メトリクスダッシュボード** — Deployment Frequency / Lead Time for Changes / Change Failure Rate / Revert Rate / Change Size / Time to First Review
+- **期間切り替え・日付フィルター・複数リポジトリの比較**
+- **個人別メトリクス** — マージ PR 数・レビュー数の集計とアクティビティ履歴（PR・コミット・レビュー）
+- **Issue 依存関係グラフ** — [React Flow](https://reactflow.dev/) + dagre によるインタラクティブな可視化。GitHub の依存関係 API と双方向に同期し、グラフ／テーブルの両表示に対応
+- **GitHub Projects v2 連携** — Priority / Size をカード・テーブルに表示し、テーブルから編集可能
 - **データエクスポート** — JSON / CSV
+- **多言語対応** — 英語 / 日本語
 - **GitHub トークン管理** — Settings ページから複数トークンの登録・テスト・切り替え
 
-## 計算ロジック
-
-### チームメトリクス（チャート・期間サマリー）
-
-| メトリクス | 計算方法 |
+| メトリクス | データソース |
 |---|---|
-| Deployment Frequency | 期間内のマージ済み PR 数を日・週・月で集計 |
-| Lead Time for Changes | PR の `created_at` 〜 `merged_at` の差分（時間） |
-| Change Failure Rate | マージ時に CI が失敗した PR の割合 |
-| Revert Rate | 期間内コミットのうち "revert" コミットの割合 |
-| Change Size | PR あたりの `additions + deletions`（LOC）の平均・σ |
-| Time to First Review | PR の `created_at` 〜 最初のレビュー `submitted_at` の差分（時間） |
+| Deployment Frequency | マージ済み PR 数 |
+| Lead Time for Changes | PR 作成〜マージまでの時間 |
+| Change Failure Rate | マージ時の CI 失敗率 |
+| Revert Rate | リバートコミットの割合 |
+| Change Size | PR あたりの変更行数（LOC） |
+| Time to First Review | PR 作成〜最初のレビューまでの時間 |
 
-### 個人別メトリクス
-
-- **PR メトリクス**: マージ済み PR の **Assignees** を基に個人に帰属させる。Assignees が未設定の場合は PR 作成者（`user_login`）にフォールバック。1 つの PR に複数 Assignees がいる場合、各担当者にそれぞれカウントされる。
-- **レビューメトリクス**: レビューの `user_login` を基に集計。Bot は除外。
-
-### アクティビティ履歴（モーダル）
-
-ユーザー名クリックで表示されるモーダルには 3 つのタブがある:
-
-- **Merged PRs** — 当該ユーザーが Assignee（またはフォールバックで作成者）のマージ済み PR
-- **Commits** — マージコミットの `author.email` から `login → email` のマッピングを構築し、コミットを個人に紐付け
-- **Reviews** — 当該ユーザーのレビュー履歴
-
-## Issue 依存関係グラフ
-
-各リポジトリページの **「Dependency Graph」** リンクから、Issue 間の依存関係を [React Flow](https://reactflow.dev/) のキャンバスで可視化できます。レイアウトは dagre による自動配置（上から下）で、パン / ズーム / ミニマップに対応しています。
-
-**GitHub が正（source of truth）です。** devpulse 独自の依存関係データは持たず、GitHub の Issue 依存関係 API と同期します。
-
-- **2 種類の関係を描き分け** — 性質が違うので表現も分けています。依存関係（blocked by）は**矢印**、サブイシューの親子関係は**枠（親 Issue が子を囲むコンテナ）**として描画します。親子を矢印にすると「親が終わってから子」と誤読されるためです（実際は逆で、子が終わって親が完了します）。
-- **読み取り** — 「更新」ボタンによる収集時に、各 Issue の `dependencies/blocked_by` と `sub_issues` を取得してローカル DB を GitHub の状態で置き換えます。GitHub 側で削除された関係はローカルからも消えます。
-- **書き込み** — グラフページから依存関係を追加・削除すると、まず GitHub API に反映され、成功した場合のみローカルに反映されます。循環依存や自己依存の検証は GitHub 側が行います（拒否理由がそのまま画面に表示されます）。
-- **優先度・サイズの表示** — GitHub Projects v2 の **Priority / Size** フィールドをカードのバッジとして表示し、テーブルにも並べ替え可能な列を追加します。優先度はカード左端の色帯でも強調します（高＝赤 / 中＝橙 / 低＝グレー）。カードの塗り分けはステータスに使っているため、色帯という別の視覚要素にしています。
-- **テーブル上で編集** — テーブル表示の**優先度・サイズ・担当者**のセルはクリックで編集できます。優先度・サイズはそのボードが持つ選択肢だけを提示し、担当者はリポジトリの Assignable users からチェックボックスで選びます。依存関係の編集と同じく **GitHub が先**で、GitHub が受け付けた場合にのみローカルに反映します。拒否された場合は画面に理由を表示し、セルの表示は GitHub 側の値のまま変わりません。ボードに載っていない Issue は優先度・サイズが編集不可になり、その理由がツールチップで出ます（担当者は編集できます）。
-- **フィールド名の解釈** — `Priority` と `Size` は Projects のテンプレート既定名にすぎないため、名前は正規表現で照合します。Size は `Estimate` / `Story Points` / `SP` なども同じものとして扱います。値は単一選択・数値・テキストのいずれでも読めます。
-- **優先度のランク付け** — `P0` `P1` `Urgent` `High` `緊急` は高、`P2` `Medium` `中` は中、`P3` `Low` `minor` は低として色分けします。解釈できない値（`Someday` など）はバッジには**そのまま表示**し、強調だけを行いません。並べ替えはランク → 表記の順なので、同じ「高」の中でも `P0` が `P1` より上に来ます。サイズはストーリーポイント（数値）とTシャツサイズを別スケールとして扱い、`2` の後に `10` が来ます。
-- **ステータスの判定** — Issue が Closed なら「完了」。Open の場合、担当者が割り当てられているか `in-progress` / `wip` 系のラベルが付いていれば「対応中」、それ以外は「未着手」として色分け表示します。
-- **担当者情報のバックフィル** — Issue の差分取得は「前回以降に更新された Issue」しか返さないため、この機能より前に収集済みの Issue には担当者情報が入りません。そこで担当者を全件取得済みかどうかを `metadata.issues_assignees_synced_at` に記録し、未記録のリポジトリでは次回の「更新」時に一度だけ Issue を全件取り直します（以降は通常の差分取得に戻ります）。同様に関係データの初回同期は `metadata.issue_relations_synced_at` で管理します。
-- **起点を指定した部分グラフ表示** — 「すべて」ではリポジトリの全 Issue を表示します（依存関係も親子関係も持たない Issue は、線のつながっていない単独のカードとして並びます）。「Issue で絞り込み」「ラベル / タグで絞り込み」を選ぶと、その起点を含む連結成分のみに絞れます。「Issue で絞り込み」では検索ボックスに**タイトルの一部**か**Issue 番号**（`207` / `#20` のような前方一致）を入力してリストを絞り込めます。検索条件から外れても選択済みの Issue はリスト先頭に残るため、選択を見失ったり解除できなくなったりしません。
-- **ブロック中の依存が動く** — 依存元（blocker）がまだ Open の矢印だけを破線アニメーションにします。止まっている＝まだ解消されていない依存、静止＝解消済み、として色を増やさずに読み分けられます。
-- **ホバーで依存チェーンをたどる** — カードにホバーすると、上流（その Issue を止めているもの）と下流（その Issue 待ちのもの）をたどってハイライトし、無関係なノードを薄くします。上流は赤系・下流は青系で塗り分け、起点から 1 ホップにつき 45ms ずつ遅らせて外側へ順に点灯するので、伝播の向きが見て取れます。ハイライト中のチェーン上の矢印には、進行方向へ動く粒子が流れます（60 本を超えるチェーンでは粒子は出しません）。
-- **レイアウト変更時のスライド** — レイアウトの向きを変えたり配置をリセットしたりすると、カードは瞬間移動せず 280ms かけて新しい位置へ滑ります。同じカードがどこへ移ったか目で追えます。
-- **グラフ / テーブル切り替え** — ツールバーの「表示」でキャンバスと表を切り替えられます。表は Issue・タイトル・ステータス・担当者・親 Issue・ブロック元・ブロック先の 7 列で、各見出しをクリックするとその列で並べ替えられます（同値のときは Issue 番号順で安定）。起点フィルタと表示上限は両方の表示に等しく効くため、同じ範囲を「形で見る」「一覧で読む」で行き来できます。グラフでしか意味を持たないレイアウト方向の選択は、テーブル表示のときは隠れます。
-- **レイアウトの向き** — 「上から下」（既定）と「左から右」を切り替えられます。並行して進む Issue が多いと上から下では横に広がるため、その場合は左から右にすると縦に伸びて読みやすくなります（逆も同様です）。向きを変えるとハンドル（●）の位置も上下から左右に移り、ドラッグした一時的な配置はリセットされます。
-- **表示上限** — 一度に描画する Issue 件数の上限を選べます（100 / 250 / **500**（既定） / 1000 / 2000 / 上限なし）。上限を超えた場合は「N 件中 M 件を表示しています」と表示されます。間引く順番は情報量の少ないものからで、**依存関係・親子関係を 1 つも持たない Issue を先に落とし**、それでも収まらない場合は番号の小さい（古い）ものから落とします。片方の端が残らなかった関係は描画されないため、行き先のない矢印や親のいないコンテナは発生しません。
-- **グラフ上で直接つなぐ** — ノードの出口側の●から別ノードの入口側の●へドラッグすると依存関係を追加できます（●の位置はレイアウト方向によって変わります）。矢印を選択して Delete / Backspace キーで削除できます。
-- **カードの移動** — ノードはドラッグで自由に動かせます。混み合ったグラフを一時的に整理する用途で、位置は保存されません（リロードで dagre の自動配置に戻ります）。動かした後は「配置をリセット」ボタンでいつでも自動配置に戻せます。
-- **全画面表示** — キャンバス右上の「全画面表示」ボタンでグラフをウィンドウ全体に広げられます。Esc キーまたは同じ位置の「全画面表示を終了」で戻ります。全画面のままでも依存関係の追加・削除やカードの移動はそのまま行えます。
-- **ノードから Issue へ遷移** — 各ノードはリンクになっており、クリック（中クリック / キーボード操作も可）で GitHub の該当 Issue を新しいタブで開きます。
-
-> アニメーション（破線の流れ・粒子・スライド）は OS の「視差効果を減らす」設定（`prefers-reduced-motion: reduce`）を尊重して停止します。
-> ホバー時のハイライト自体は情報であって装飾ではないため、この設定でも動作します。
-
-> **優先度・サイズをテーブルから変更するには、プロジェクトの書き込み権限（Classic: `project` / Fine-grained: Projects: Read and write）が必要です。**
-> **担当者の変更にはリポジトリへの push 権限が必要です。**
-> GitHub は push 権限が無い担当者変更を **200 を返しつつ黙って無視する**ため、レスポンスの担当者を読み戻して要求と一致するか確認し、一致しない場合はエラーとして表示します。
-
-> **Priority / Size の取得には、トークンにプロジェクトの読み取り権限が必要です。**
-> Classic PAT なら `read:project` スコープ、Fine-grained PAT なら組織の **Projects: Read** です。
-> 権限が無い場合は収集自体は成功し、Priority / Size だけがスキップされます（サーバーログに `Skipping project fields:` と出力）。このとき**既に保存済みの値は消えません**。
-
-> **依存関係の追加・削除には、トークンに `Issues: Read and write` 権限が必要です。**
-> 読み取り専用トークンの場合、グラフの表示はできますが追加・削除は GitHub に拒否され、その旨が画面に表示されます。
-
-> 関係データを一括取得する API（GraphQL 等）が無いため、収集時に **Issue 1 件あたり 2 リクエスト**（依存関係・親子関係）が発生します。Issue 数の多いリポジトリでは収集に時間がかかります。
-> 他リポジトリの Issue との依存関係は、グラフが 1 リポジトリ単位のためスキップされます（件数はサーバーログに出力されます）。
-
-### デモデータで試す
-
-GitHub からデータを収集しなくても、デモ用のリポジトリを投入して動作を確認できます。
-
-```bash
-pnpm seed:demo                        # acme/checkout-revamp を作成
-pnpm seed:demo --repo my-org/my-app   # 任意の名前で作成
-pnpm dev                              # http://localhost:3000/acme__checkout-revamp/dependencies
-```
-
-3 つのエピック（`epic: checkout` / `epic: payments` / `epic: infra`）に分かれた 25 件の Issue、21 件の依存関係、20 件の親子関係が入ります。Priority / Size も投入され、`P0`〜`P3` と `High`/`Medium`/`Low` の 2 系統、Tシャツサイズとストーリーポイントの 2 系統、解釈できない値（`Someday`）、未設定の Issue がすべて含まれます。未着手・対応中・完了の 3 状態、関係を持たない Issue、独立した複数のクラスタが含まれるため、起点フィルタの効果も確認できます。
-
-> 投入されるのは Issue と関係データのみです。リポジトリページの DORA メトリクスは空のままになります。
-> また、このデモリポジトリは GitHub 上に存在しないため「更新」ボタンは使えません（実行すると GitHub 側の状態、つまり空で上書きされます）。
-> スクリプトは Node の TypeScript 実行機能をそのまま使うため、Node 22.18 以降（`mise.toml` の指定は 24）が必要です。
-
-## セットアップ
-
-### 前提条件
+## Requirements
 
 - Node.js 18+
 - pnpm
 
-### インストール
+## Setup
 
 ```bash
 pnpm install
 cp .env.sample .env
-```
-
-### 環境変数
-
-`.env` ファイルに以下を設定してください。
-
-| 変数名 | 説明 | デフォルト値 |
-|---|---|---|
-| `DATA_DIR` | データディレクトリパス | `./data` |
-| `GITHUB_TOKEN` | GitHub Personal Access Token | — |
-| `ALLOW_TOKEN_UI` | UI からのトークン管理を許可 | `true` |
-| `ENCRYPTION_KEY` | DB 内トークンの暗号化キー | (自動生成) |
-| `GITHUB_API_URL` | GitHub API のベース URL（GitHub Enterprise Server 用） | `https://api.github.com` |
-
-### GitHub Personal Access Token の設定
-
-リポジトリの検索・データ収集に GitHub PAT が必要です。環境変数 `GITHUB_TOKEN` に設定するか、Settings ページから UI で登録できます。
-
-#### Fine-grained PAT（推奨）
-
-[GitHub Settings > Developer settings > Personal access tokens > Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) から作成してください。
-
-対象リポジトリに対して以下の権限を付与してください。
-
-| 権限 | アクセス | 用途 |
-|---|---|---|
-| **Metadata** | Read | リポジトリ検索・一覧の取得 |
-| **Contents** | Read | コミット履歴の取得 |
-| **Issues** | Read / **Read and write** | Issue 履歴・依存関係・サブイシューの取得。依存関係グラフから追加・削除を行う場合は write が必要 |
-| **Projects** | Read / **Read and write** | Projects v2 の Priority / Size フィールドの取得（組織レベルの権限。無くても収集は成功し、この 2 項目だけ空になります）。テーブルから変更する場合は write が必要 |
-| **Pull requests** | Read | PR 一覧・詳細（変更行数）・レビュー履歴の取得 |
-| **Checks** | Read | CI 実行結果の取得（Change Failure Rate の算出に**必須**） |
-| **Commit statuses** | Read | CI ステータスの取得（Checks と併用推奨） |
-
-> **注意: Checks 権限がないと Change Failure Rate が常に 0% になります。**
-> 権限が不足している場合、CI ステータスの取得はサイレントにスキップされ、
-> サーバーログに `Skipping CI status check: Token lacks 'Checks: Read' permission` と出力されます。
-> Fine-grained PAT を作成した後からでも、Settings > Developer settings > Fine-grained tokens から権限を追加できます。
-
-#### Classic PAT
-
-`repo` スコープを付与してください。Projects v2 の Priority / Size も取得する場合は `read:project` も追加してください。
-
-## 使い方
-
-### 開発サーバー起動
-
-```bash
 pnpm dev
 ```
 
 http://localhost:3000 を開きます。
 
-### データ収集
+## Configuration
 
-1. トップページの **「+ Add Repository」** ボタンをクリック
-2. リポジトリを検索・選択し **「Collect」** をクリック
-3. データ収集が完了したら **「View」** でメトリクスを確認
+`.env` に設定する主な変数:
 
-### データ構造
+| 変数名 | 説明 | デフォルト |
+|---|---|---|
+| `DATA_DIR` | データディレクトリパス | `./data` |
+| `GITHUB_TOKEN` | GitHub Personal Access Token | — |
+| `ALLOW_TOKEN_UI` | UI からのトークン管理を許可 | `true` |
+| `ENCRYPTION_KEY` | DB 内トークンの暗号化キー | (自動生成) |
+| `GITHUB_API_URL` | GitHub Enterprise Server 用ベース URL | `https://api.github.com` |
 
-収集されたデータは `DATA_DIR` 以下にリポジトリごとの DuckDB ファイルとして保存されます。
+### GitHub Personal Access Token
 
+`GITHUB_TOKEN` に設定するか、Settings ページの UI から登録できます。Fine-grained PAT の場合、対象リポジトリに以下の権限が必要です。
+
+| 権限 | アクセス | 用途 |
+|---|---|---|
+| Metadata | Read | リポジトリ検索・一覧取得 |
+| Contents | Read | コミット履歴取得 |
+| Issues | Read（write で依存関係の追加・削除も可） | Issue・依存関係・サブイシュー取得 |
+| Projects | Read（write でテーブル編集も可） | Priority / Size 取得（組織レベル、無くても収集は成功） |
+| Pull requests | Read | PR・レビュー履歴取得 |
+| Checks / Commit statuses | Read | CI 結果取得（**Change Failure Rate の算出に必須**） |
+
+Classic PAT の場合は `repo` スコープ（Projects も使う場合は `read:project` を追加）で代用できます。
+
+## Usage
+
+1. トップページの **「+ Add Repository」** でリポジトリを追加
+2. **「Collect」** をクリックしてデータ収集
+3. **「View」** でメトリクスを確認
+
+データは `DATA_DIR/<owner>__<repo>/repo.duckdb` に保存され、2 回目以降は差分のみを GitHub API から取得します。
+
+### デモデータで試す
+
+```bash
+pnpm seed:demo
+pnpm dev  # http://localhost:3000/acme__checkout-revamp/dependencies
 ```
-data/
-  └── <owner>__<repo>/
-      └── repo.duckdb
-```
 
-各 DB には `metadata`, `commits`, `pull_requests`, `releases`, `issues` テーブルが含まれます。
+GitHub と同期せず、Issue 依存関係グラフの動作を確認できます（DORA メトリクスは空のままです）。
 
-既存の JSON ダンプ（`YYYYMMDD_HHMMSS/*.json`）がある場合、初回アクセス時に自動で DuckDB へ移行されます。
+## Tech Stack
 
-#### 差分取得
-
-2回目以降のデータ収集では、DB 内の最新タイムスタンプを基に差分のみを GitHub API から取得します。これにより API コール数を大幅に削減できます。
-
-## 技術スタック
-
-- [Next.js](https://nextjs.org/) (App Router)
-- [React](https://react.dev/)
-- [Recharts](https://recharts.org/) (チャート描画)
-- [React Flow](https://reactflow.dev/) + [dagre](https://github.com/dagrejs/dagre) (依存関係グラフの描画・自動レイアウト)
+- [Next.js](https://nextjs.org/) (App Router) / [React](https://react.dev/) / [TypeScript](https://www.typescriptlang.org/)
+- [Recharts](https://recharts.org/)（チャート描画）
+- [React Flow](https://reactflow.dev/) + [dagre](https://github.com/dagrejs/dagre)（依存関係グラフ）
 - [Tailwind CSS](https://tailwindcss.com/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [DuckDB](https://duckdb.org/) (データ永続化・クエリ、`@duckdb/node-api`)
+- [DuckDB](https://duckdb.org/)（データ永続化、`@duckdb/node-api`）
 
 ## Docker
 
