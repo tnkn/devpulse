@@ -2,7 +2,7 @@
 
 # Default target
 help:
-	@echo "dev-vis - GitHub Repository DORA Metrics Visualization"
+	@echo "devpulse - GitHub Repository DORA Metrics Visualization"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make install      - Install dependencies"

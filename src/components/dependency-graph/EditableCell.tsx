@@ -114,7 +114,7 @@ export function EditableCell({
 const RECENT_LIMIT = 5;
 
 function recentKey(repoKey: string) {
-  return `dev-vis:recent-assignees:${repoKey}`;
+  return `devpulse:recent-assignees:${repoKey}`;
 }
 
 function readRecent(repoKey: string): string[] {

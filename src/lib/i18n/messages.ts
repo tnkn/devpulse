@@ -280,7 +280,7 @@ const en: Messages = {
     confirm: "Confirm",
     loading: "Loading...",
     lastCollected: "Last collected",
-    devVis: "dev-vis",
+    devVis: "devpulse",
   },
   home: {
     subtitle: "GitHub Repository DORA Metrics Visualization",
@@ -570,7 +570,7 @@ const ja: Messages = {
     confirm: "\u78BA\u8A8D",
     loading: "\u8AAD\u307F\u8FBC\u307F\u4E2D...",
     lastCollected: "\u6700\u7D42\u53D6\u5F97",
-    devVis: "dev-vis",
+    devVis: "devpulse",
   },
   home: {
     subtitle:
