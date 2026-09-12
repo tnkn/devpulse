@@ -48,6 +48,7 @@ http://localhost:3000 を開きます。ポートを変えるには `.env` の `
 |---|---|---|
 | `DATA_DIR` | データディレクトリパス | `./data` |
 | `PORT` | 待ち受けポート（docker compose ではホスト側ポート） | `3000` |
+| `ALLOWED_DEV_ORIGINS` | 開発サーバーへのアクセスを許可するオリジン（カンマ区切り） | — |
 | `GITHUB_TOKEN` | GitHub Personal Access Token | — |
 | `ALLOW_TOKEN_UI` | UI からのトークン管理を許可 | `true` |
 | `ENCRYPTION_KEY` | DB 内トークンの暗号化キー | (自動生成) |
