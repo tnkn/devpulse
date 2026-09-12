@@ -40,6 +40,17 @@ jobs:
         run: |
           mise install
           mise bin-paths >> "$GITHUB_PATH"
+      - name: Verify pinned pnpm versions agree
+        # pnpm --version delegates to the packageManager version, so it cannot
+        # detect the drift. Compare the two declarations directly instead.
+        run: |
+          mise_pnpm="$(mise cfg get tools.pnpm)"
+          pkg_pnpm="$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")"
+          if [ "$mise_pnpm" != "$pkg_pnpm" ]; then
+            echo "pnpm version drift: mise.toml=$mise_pnpm packageManager=$pkg_pnpm" >&2
+            exit 1
+          fi
+          echo "pnpm $mise_pnpm"
       - name: Resolve pnpm store directory
         id: pnpm-store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
