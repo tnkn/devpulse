@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/with-env.mjs next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/with-env.mjs next start",
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "typecheck": "tsc --noEmit",
-    "seed:demo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-demo-data.mts"
+    "seed:demo": "node scripts/with-env.mjs node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-demo-data.mts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
