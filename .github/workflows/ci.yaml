@@ -35,13 +35,11 @@ jobs:
         run: |
           curl -fsSL https://mise.run | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Set up Node.js
-        # mise.toml is the single source of truth for the Node version.
+      - name: Set up toolchain
+        # mise.toml is the single source of truth for the Node.js and pnpm versions.
         run: |
           mise install
           mise bin-paths >> "$GITHUB_PATH"
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - name: Resolve pnpm store directory
         id: pnpm-store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
