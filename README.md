@@ -24,13 +24,14 @@ GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev
 
 ## Requirements
 
-- [mise](https://mise.jdx.dev/)
+- [mise](https://mise.jdx.dev/)（[activate 済み](https://mise.jdx.dev/getting-started.html)であること。未 activate の場合は以降の `pnpm` を `mise exec -- pnpm` に読み替えてください）
 
 Node.js と pnpm のバージョンは `mise.toml` で管理しています。
 
 ## Setup
 
 ```bash
+mise trust   # 初回のみ。mise.toml を信頼する
 mise install
 pnpm install
 cp .env.sample .env
