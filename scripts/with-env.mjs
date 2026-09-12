@@ -42,6 +42,13 @@ const child = spawn(command, args, {
   shell: process.platform === "win32",
 });
 
+// 直接の子だけにシグナルを送る監督下でも next が取り残されないよう中継する。
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    child.kill(signal);
+  });
+}
+
 child.on("exit", (code, signal) => {
   if (signal) {
     process.kill(process.pid, signal);
