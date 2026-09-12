@@ -24,12 +24,14 @@ GitHub リポジトリの開発状況を [DORA メトリクス](https://dora.dev
 
 ## Requirements
 
-- Node.js 18+
-- pnpm
+- [mise](https://mise.jdx.dev/)
+
+Node.js と pnpm のバージョンは `mise.toml` で管理しています。
 
 ## Setup
 
 ```bash
+mise install
 pnpm install
 cp .env.sample .env
 pnpm dev
