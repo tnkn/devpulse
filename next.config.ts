@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
-// LAN 上の別マシンから開発サーバーを開くときに許可するオリジン。
+// LAN 上の別マシンから開発サーバーを開くときに許可するホスト。
+// Next は Origin / Referer から取り出したホスト名だけを照合するため、
+// スキームやポートを含めた値は一致しない。
 // マシン固有の値なのでコードに直書きせず .env から受け取る（カンマ区切り）。
 const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .split(",")
