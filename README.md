@@ -35,7 +35,7 @@ cp .env.sample .env
 pnpm dev
 ```
 
-http://localhost:3000 を開きます。
+http://localhost:3000 を開きます。ポートを変えるには `.env` の `PORT` を設定してください。
 
 ## Configuration
 
@@ -44,6 +44,7 @@ http://localhost:3000 を開きます。
 | 変数名 | 説明 | デフォルト |
 |---|---|---|
 | `DATA_DIR` | データディレクトリパス | `./data` |
+| `PORT` | 待ち受けポート（docker compose ではホスト側ポート） | `3000` |
 | `GITHUB_TOKEN` | GitHub Personal Access Token | — |
 | `ALLOW_TOKEN_UI` | UI からのトークン管理を許可 | `true` |
 | `ENCRYPTION_KEY` | DB 内トークンの暗号化キー | (自動生成) |
@@ -76,7 +77,7 @@ Classic PAT の場合は `repo` スコープ（Projects も使う場合は `read
 
 ```bash
 pnpm seed:demo
-pnpm dev  # http://localhost:3000/acme__checkout-revamp/dependencies
+pnpm dev  # http://localhost:3000/acme__checkout-revamp/dependencies (PORT 未設定時)
 ```
 
 GitHub と同期せず、Issue 依存関係グラフの動作を確認できます（DORA メトリクスは空のままです）。
