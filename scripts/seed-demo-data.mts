@@ -435,7 +435,8 @@ async function main(): Promise<void> {
       `  ラベル: ${EPIC_CHECKOUT} / ${EPIC_PAYMENTS} / ${EPIC_INFRA}`,
     );
     console.log("\n  pnpm dev のあと以下を開いてください:");
-    console.log(`  http://localhost:3000/${repoKey}/dependencies\n`);
+    const port = process.env.PORT ?? "3000";
+    console.log(`  http://localhost:${port}/${repoKey}/dependencies\n`);
   } finally {
     conn.closeSync();
     instance.closeSync();
