@@ -49,4 +49,9 @@ next-env.d.ts
 
 # claude code project settings / local docs
 /.claude
-/docs
+# docs/ is scratch space by default; the Source-of-Truth directories are tracked.
+# Adding another tracked directory means adding a negation below — without one it is ignored silently.
+/docs/*
+!/docs/requirements/
+!/docs/design/
+!/docs/adr/
