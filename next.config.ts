@@ -11,6 +11,8 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // dev 起動のたびに AGENTS.md / CLAUDE.md を生成させない。
+  agentRules: false,
   serverExternalPackages: ["@duckdb/node-api"],
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   experimental: {
