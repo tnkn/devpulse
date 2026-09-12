@@ -36,7 +36,11 @@ if (!command) {
   process.exit(1);
 }
 
-const child = spawn(command, args, { stdio: "inherit" });
+// Windows では node_modules/.bin の .cmd シムを PATHEXT 解決させるため shell が要る。
+const child = spawn(command, args, {
+  stdio: "inherit",
+  shell: process.platform === "win32",
+});
 
 child.on("exit", (code, signal) => {
   if (signal) {
