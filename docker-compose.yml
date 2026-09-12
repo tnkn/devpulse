@@ -2,7 +2,8 @@ services:
   devpulse:
     build: .
     ports:
-      - "3000:3000"
+      # ホスト側のポートは .env の PORT で変更できます（既定 3000）
+      - "${PORT:-3000}:3000"
     volumes:
       - ./data:/data:ro
     environment:
