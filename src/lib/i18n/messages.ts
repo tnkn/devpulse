@@ -265,6 +265,9 @@ export type Messages = {
     connectHint: string;
     alreadyLinked: string;
     cannotLinkToItself: string;
+    linkRejected: (reason: string) => string;
+    linkNotFound: string;
+    missingIssueId: (issueNumber: number) => string;
     resetLayout: string;
     expand: string;
     exitExpand: string;
@@ -555,6 +558,13 @@ const en: Messages = {
       "Drag from one issue's outgoing handle to another's incoming handle to add a dependency. Select an arrow and press Delete to remove it. Cards can be dragged around; a reload restores the automatic layout.",
     alreadyLinked: "That dependency already exists.",
     cannotLinkToItself: "An issue cannot depend on itself.",
+    // GitHub's own reason is the whole message: guessing at a cause
+    // beside it would be noise at best and wrong at worst.
+    linkRejected: (reason) => `GitHub refused this dependency: ${reason}`,
+    linkNotFound:
+      "GitHub could not find one of these issues. It may have been deleted or moved since the last collection; press Update to re-read the repository.",
+    missingIssueId: (issueNumber) =>
+      `Issue #${issueNumber} has no stored GitHub id, which the dependency API needs. Press Update with the range set to "Everything" — a run that only reads what changed will not fill it in.`,
     resetLayout: "Reset layout",
     expand: "Full screen",
     exitExpand: "Exit full screen (Esc)",
@@ -890,6 +900,12 @@ const ja: Messages = {
       "\u305D\u306E\u4F9D\u5B58\u95A2\u4FC2\u306F\u3059\u3067\u306B\u767B\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002",
     cannotLinkToItself:
       "\u540C\u3058 Issue \u540C\u58EB\u306F\u3064\u306A\u3052\u307E\u305B\u3093\u3002",
+    linkRejected: (reason) =>
+      `GitHub \u304C\u3053\u306E\u4F9D\u5B58\u95A2\u4FC2\u3092\u62D2\u5426\u3057\u307E\u3057\u305F: ${reason}`,
+    linkNotFound:
+      "GitHub \u3067\u3069\u3061\u3089\u304B\u306E Issue \u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u524D\u56DE\u306E\u53D6\u5F97\u5F8C\u306B\u524A\u9664\u30FB\u79FB\u52D5\u3055\u308C\u305F\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002Update \u3067\u518D\u53D6\u5F97\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+    missingIssueId: (issueNumber) =>
+      `Issue #${issueNumber} \u306E GitHub \u5185\u90E8 ID \u304C\u4FDD\u5B58\u3055\u308C\u3066\u3044\u307E\u305B\u3093\uFF08\u4F9D\u5B58\u95A2\u4FC2 API \u306B\u5FC5\u8981\u3067\u3059\uFF09\u3002\u66F4\u65B0\u7BC4\u56F2\u3092\u300C\u5168\u4EF6\u300D\u306B\u3057\u3066 Update \u3092\u5B9F\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u5DEE\u5206\u53D6\u5F97\u3067\u306F\u88DC\u5B8C\u3055\u308C\u307E\u305B\u3093\u3002`,
     resetLayout: "\u914D\u7F6E\u3092\u30EA\u30BB\u30C3\u30C8",
     expand: "\u5168\u753B\u9762\u8868\u793A",
     exitExpand: "\u5168\u753B\u9762\u8868\u793A\u3092\u7D42\u4E86 (Esc)",

@@ -69,8 +69,11 @@ export async function POST(request: NextRequest) {
       if (blockerId === null) {
         return NextResponse.json(
           {
-            error: `Issue #${blocker_number} has no stored GitHub id. Run Update to refresh the repository.`,
+            error: `Issue #${blocker_number} has no stored GitHub id. Press Update with the range set to "Everything": a run that only re-reads what changed will not fill it in.`,
             code: "missing_issue_id",
+            // The number travels alongside the message so the client can
+            // say the same thing in the reader's language.
+            issue_number: blocker_number,
           },
           { status: 409 },
         );
@@ -118,8 +121,9 @@ export async function DELETE(request: NextRequest) {
       if (blockerId === null) {
         return NextResponse.json(
           {
-            error: `Issue #${blocker} has no stored GitHub id. Run Update to refresh the repository.`,
+            error: `Issue #${blocker} has no stored GitHub id. Press Update with the range set to "Everything": a run that only re-reads what changed will not fill it in.`,
             code: "missing_issue_id",
+            issue_number: blocker,
           },
           { status: 409 },
         );
