@@ -533,14 +533,44 @@ export async function getSubIssues(
   return getIssueRelation(owner, repo, issueNumber, "sub_issues", token);
 }
 
+/**
+ * Reads whatever explanation a failed response carries.
+ *
+ * `message` alone is not enough: a 422 always says "Validation Failed"
+ * and puts the actual reason — the cycle, the missing field, the issue
+ * that cannot be linked — in `errors`. Dropping that leaves the caller
+ * with a message it can display but nobody can act on.
+ */
 async function readErrorMessage(res: Response): Promise<string> {
   try {
     const body = await res.json();
-    if (body && typeof body.message === "string") return body.message;
+    const message = typeof body?.message === "string" ? body.message : null;
+    const details = Array.isArray(body?.errors)
+      ? body.errors.map(describeApiError).filter(Boolean)
+      : [];
+    // Details win when both are present: alongside "Issue cannot be
+    // blocked by an issue it blocks", a leading "Validation Failed" is
+    // only noise.
+    if (details.length > 0) return details.join("; ");
+    if (message) return message;
   } catch {
     // Fall through to the status text
   }
   return `${res.status} ${res.statusText}`;
+}
+
+/** One entry of a GitHub `errors` array, which may be a string or object. */
+function describeApiError(entry: unknown): string {
+  if (typeof entry === "string") return entry;
+  if (typeof entry !== "object" || entry === null) return "";
+  const e = entry as Record<string, unknown>;
+  if (typeof e.message === "string" && e.message) return e.message;
+  // No message means the shape is the coded one: "missing_field" and the
+  // field it refers to say more together than either does alone.
+  const parts = [e.field, e.code].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  return parts.join(": ");
 }
 
 /**

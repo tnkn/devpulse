@@ -132,10 +132,33 @@ const PRIORITY_BADGE_CLASS: Record<string, string> = {
 const UNRANKED_BADGE_CLASS =
   "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
 
-// Big enough to grab: these are the drag targets for creating a
-// dependency, not just decoration.
+// These are the drag targets for creating a dependency, not decoration,
+// so they have to be grabbable — but a dot large enough to grab at the
+// zoom fitView picks for a wide graph would be a blob at 1:1.
 const HANDLE_CLASS =
-  "!h-3 !w-3 !border-2 !border-white dark:!border-gray-900 !bg-gray-400 dark:!bg-gray-500 hover:!bg-blue-500 hover:!h-4 hover:!w-4 transition-all";
+  "!h-3 !w-3 !border-2 !border-white dark:!border-gray-900 !bg-gray-400 dark:!bg-gray-500 hover:!bg-blue-500 hover:!h-4 hover:!w-4 transition-all after:absolute after:content-['']";
+
+/**
+ * An invisible box around the dot that is what the pointer actually has
+ * to hit. Twelve pixels of dot measure about seven on screen once fitView
+ * has zoomed out a graph of any size, and fewer the larger it gets, which
+ * is below what anyone can reliably aim at. The box keeps the dot small
+ * and makes the target big.
+ *
+ * It grows away from the card only. Growing inwards would put it over the
+ * issue link the card is made of, and a press meant to open the issue
+ * would start dragging a dependency instead.
+ */
+const HANDLE_HIT_AREA: Record<Position, string> = {
+  [Position.Top]: "after:-inset-x-3 after:-top-4 after:bottom-0",
+  [Position.Bottom]: "after:-inset-x-3 after:top-0 after:-bottom-4",
+  [Position.Left]: "after:-inset-y-3 after:-left-4 after:right-0",
+  [Position.Right]: "after:-inset-y-3 after:left-0 after:-right-4",
+};
+
+function handleClass(position: Position, extra = ""): string {
+  return `${HANDLE_CLASS} ${HANDLE_HIT_AREA[position]} ${extra}`;
+}
 
 /**
  * Upstream and downstream get different colours because they answer
@@ -265,7 +288,7 @@ function IssueNode({
       <Handle
         type="target"
         position={targetPosition ?? Position.Top}
-        className={HANDLE_CLASS}
+        className={handleClass(targetPosition ?? Position.Top)}
       />
       <a
         href={data.url}
@@ -289,7 +312,7 @@ function IssueNode({
       <Handle
         type="source"
         position={sourcePosition ?? Position.Bottom}
-        className={HANDLE_CLASS}
+        className={handleClass(sourcePosition ?? Position.Bottom)}
       />
     </div>
   );
@@ -305,7 +328,7 @@ function TerminalNode({
       <Handle
         type="target"
         position={targetPosition ?? Position.Top}
-        className={HANDLE_CLASS}
+        className={handleClass(targetPosition ?? Position.Top)}
       />
       <div
         style={{ width: TERMINAL_NODE_WIDTH, height: TERMINAL_NODE_HEIGHT }}
@@ -316,7 +339,7 @@ function TerminalNode({
       <Handle
         type="source"
         position={sourcePosition ?? Position.Bottom}
-        className={HANDLE_CLASS}
+        className={handleClass(sourcePosition ?? Position.Bottom)}
       />
     </div>
   );
@@ -346,7 +369,10 @@ function GroupNode({
       <Handle
         type="target"
         position={targetPosition ?? Position.Top}
-        className={`${HANDLE_CLASS} !pointer-events-auto`}
+        className={handleClass(
+          targetPosition ?? Position.Top,
+          "!pointer-events-auto",
+        )}
       />
       <div
         className={`pointer-events-none h-full w-full rounded-xl border-2 border-dashed bg-gray-500/5 dark:bg-gray-400/5 ${STATUS_ACCENT_CLASS[data.status]}`}
@@ -370,7 +396,10 @@ function GroupNode({
       <Handle
         type="source"
         position={sourcePosition ?? Position.Bottom}
-        className={`${HANDLE_CLASS} !pointer-events-auto`}
+        className={handleClass(
+          sourcePosition ?? Position.Bottom,
+          "!pointer-events-auto",
+        )}
       />
     </div>
   );

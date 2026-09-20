@@ -16,7 +16,7 @@ import {
   type NodePositionOverrides,
 } from "@/lib/dependencies/graph";
 import type { LayoutDirection } from "@/lib/dependencies/layout";
-import { useI18n } from "@/lib/i18n";
+import { type Messages, useI18n } from "@/lib/i18n";
 import type {
   Issue,
   IssueDependencyEdge,
@@ -53,6 +53,42 @@ interface Props {
 }
 
 type ViewMode = "graph" | "table";
+
+/** The shape the dependency route answers a refused write with. */
+interface LinkErrorBody {
+  error?: string;
+  code?: string;
+  issue_number?: number;
+}
+
+/**
+ * Turns a refusal from the dependency route into something the reader can
+ * act on.
+ *
+ * GitHub's own wording is kept where it explains anything, but on its own
+ * "Validation Failed" or "Not Found" says only that the link did not
+ * happen — never why, or what to do about it.
+ */
+function linkErrorMessage(
+  data: LinkErrorBody,
+  t: Messages,
+  fallback: string,
+): string {
+  switch (data.code) {
+    case "forbidden":
+      return t.dependencies.writePermissionRequired;
+    case "rejected":
+      return t.dependencies.linkRejected(data.error ?? "");
+    case "not_found":
+      return t.dependencies.linkNotFound;
+    case "missing_issue_id":
+      return data.issue_number !== undefined
+        ? t.dependencies.missingIssueId(data.issue_number)
+        : data.error || fallback;
+    default:
+      return data.error || fallback;
+  }
+}
 
 /** 0 stands for "no limit". */
 const DISPLAY_LIMIT_OPTIONS = [100, 250, DEFAULT_DISPLAY_LIMIT, 1000, 2000, 0];
@@ -279,9 +315,7 @@ export function DependencyGraph({
         const data = await res.json();
         if (!res.ok) {
           throw new Error(
-            data.code === "forbidden"
-              ? t.dependencies.writePermissionRequired
-              : data.error || "Failed to add dependency",
+            linkErrorMessage(data, t, "Failed to add dependency"),
           );
         }
         setEdges(data.edges ?? []);
@@ -310,6 +344,9 @@ export function DependencyGraph({
 
   const handleRemove = useCallback(
     async (blocker: number, blocked: number) => {
+      // Cleared here as well as on an add: a message left over from a
+      // refused link reads as if this removal had failed too.
+      setError(null);
       setPending(true);
       try {
         const res = await fetch(
@@ -319,9 +356,7 @@ export function DependencyGraph({
         const data = await res.json();
         if (!res.ok) {
           throw new Error(
-            data.code === "forbidden"
-              ? t.dependencies.writePermissionRequired
-              : data.error || "Failed to remove dependency",
+            linkErrorMessage(data, t, "Failed to remove dependency"),
           );
         }
         setEdges(data.edges ?? []);
